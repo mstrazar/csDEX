@@ -1,0 +1,18 @@
+exportPattern("^[[:alpha:]]+")
+exportMethods(
+    "colData",
+    "colData<-",
+    "cpmData",
+    "cpmData<-",
+    "dataType",
+    "estimateDispersions",
+    "estimateGeneCPM",
+    "estimateSizeFactors",
+    "exprData",
+    "exprData<-",
+    "rowData",
+    "rowData<-" 
+)
+exportClasses(
+    "csDEXdataSet" 
+)

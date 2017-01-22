@@ -1,0 +1,10 @@
+Package: csDEX
+Type: Package
+Title: Condition-specific differential exon expression.
+Version: 1.0
+Date: 2017-01-22
+Author: Martin Strazar
+Maintainer: Who to complain to <yourfault@somewhere.net>
+Description: More about what it does (maybe more than one line)
+License: What license is it under?
+Depends: methods, DESeq2, edgeR, aod, utils, betareg, reshape, parallel
