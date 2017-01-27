@@ -7,129 +7,136 @@ vignette: >
 %\VignetteEngine{knitr::rmarkdown}
 \usepackage[utf8]{inputenc}
 ---
-  
-# Build with R CMD Sweave vignettes/csdex_vignette.Rmd
- 
 
+
+# The csDEX package: Quick Start
+
+  
+Build with R CMD Sweave vignettes/csdex_vignette.Rmd
+ 
 csDEX (Condition-specific Differential Exon Expression) is a family of general
 linear models (GLMs), used to model differential splicing given a set of
-sequencing experiments based od RNA-seq. The methods assume tens to hundreds
+sequencing experiments based on RNA-seq. The methods assume tens to hundreds
 experimental conditions to be compared, and the result are
 changes in usage of splice sites that are specific (particular) to an
 experimental condition. 
 
 Main features include:
-    * handling of sequence data in form of read counts or percentages (e.g. percent-spliced in, PSI),
-    * modelling all type of splicing events,
-    * discovery and ranking of condition-specific changes,
-    * parallel processing of multiple genes (groups),
-    * time-efficient model approximation with no change in false positive rate.
+* handling of sequence data in form of read counts or percentages (e.g. percent-spliced in, PSI),
+* modelling all type of splicing events,
+* discovery and ranking of condition-specific changes,
+* parallel processing of multiple genes (groups),
+* time-efficient model approximation with no change in false positive rate.
 
-Installation
+## Installation
 
 The easiest installation method is via GitHub:
 ```{r}
-    % install.packages("")
+# install.packages("")
 ```
 
 
-
-Data preparation
+## Data preparation
 
 The package assumes a directory with replicate data and a design (decoder) file
 to link experimental conditions to appropriate files.
 
 
-Replicate data
+### Replicate data
  
-Replicate data is stored as .txt files containg a table with two columns in the
+Replicate data is stored as `.txt` files containing a table with two columns in the
 following format:
-groupID:featureID    value
-groupID:featureID    value
-...
+```
+    groupID:featureID    value
+    groupID:featureID    value
+```
 
 The replicate files are tab- or space-delimited and have no header line. The
 fields encode the following information:
-    * groupID: group of features belonging to the same transcriptional unit, most commonly a gene. Example: ENSG00000012345
-    * featureID: alternative transcriptional unit, such as an exon, exonic part, alternative 5'/3' end, etc. Most commonly referring to a non-overlapping exonic bin, to which reads are mapped. Example: ENSE00000067890
-    * value: expression quantification, either in form of read counts mapping to the feature (non-negative integers) or percentage spliced-in (PSI, real numbers 0.0-1.0, inclusive). Choice of quantificantion shall be consistent within and between all files.
+* groupID: group of features belonging to the same transcriptional unit,
+    most likely a gene.    
+* featureID: alternative transcriptional unit, such as an exon, exonic
+    part, alternative 5'/3' end, etc. Most commonly referring to a
+    non-overlapping exonic bin, to which reads are mapped.
+* value: expression quantification, either in form of read counts mapping
+    to the feature (non-negative integers) or percentage spliced-in (PSI,
+    real numbers 0.0-1.0, inclusive). Choice of quantification shall be
+    consistent within and between all files.
 
 Example for PSI:
+```
     ENSG00000012345:ENSE00000067890 0.42
     ENSG00000012345:ENSE00000067891 0.71
     ENSG00000012346:ENSE00000067892 0
     ENSG00000012346:ENSE00000067893 1.0
+```
 
 An arbitrary number of replicates can be used for each experimental conditions.
 
 
-Obtaining replicate files from BAM/SAM files. Given the number of available
-tools out there, we do not reinvent the wheel but point users to existing
-tools. These will typically assume a genome annotation listed in a .gtf/.gff
-format.
-    * Read count data:
-        - QoRTs
-        - DEXSeq
-    * PSI:
-        - cuffDiff
-        - rMATS
-        - manually from ENCODE pre-made transcript quantifications
+#### Obtaining replicate files from BAM/SAM files. 
+
+Given the number of available tools out there, we do not reinvent the wheel but
+point users to existing tools. These will typically assume a genome annotation
+listed in a .gtf/.gff format.
+* Read count data:
+** QoRTs
+** DEXSeq
+* PSI:
+** cuffLinks
+** rMATS
+** manually from ENCODE pre-made transcript quantifications
 
 
-The design file.
+### The design file.
 
 The experimental design is stored as a tab-delimited table and links replicate filenames to
-experimental conditions. It assumes (at least) two colums with arbitrary
+experimental conditions. It assumes (at least) two columns with arbitrary
 names, denoting
-    * File.accession: replicate file name within the input directory, without extension.
-    * Experiment.target: experimental condition identifier
-    * input.read.count: (optional) Number of reads from which the replicate was generated. Required to compute gene counts-per-million reads (CPM) if required.
+* `File.accession`: replicate file name within the input directory, without extension.
+* `Experiment.target`: experimental condition identifier
+* `input.read.count`: (optional) Number of reads from which the replicate was generated. Required to compute gene counts-per-million reads (CPM) if required.
 
-Files sharing the same Experiment.target are assumed to be technical replicates
+Files sharing the same `Experiment.target` are assumed to be technical replicates
 of the same experimental condition. The column names are not fixed and can be defined at
 runtime. Other columns can be stored, but will be ignored by csDEX. The format
 is consistent with the ENCODE metadata format.
 
-Example:
-
-
-
-There are two exemplary small datasets provided with the csDEX package, to be
+Two exemplary small datasets are provided with the csDEX package, to be
 used for testing purposes only.
 
 
 
-Running csDEX
-
+## Running csDEX
 
 Once csDEX is installed, the setup can be tested using the provided data.
 
-The example files are acessed as follows.
-```{r}
-    require(csDEX)
+The example files are accessed as follows.
+```{r message=FALSE}
+require(csDEX)
 
-    design.file = system.file("extdata/metadata.tsv", 
-        package="csDEX", mustWork=TRUE)
-    data.dir.psi = system.file("extdata/psi", 
-        package="csDEX", mustWork=TRUE)
-    data.dir.count = system.file("extdata/count", 
-        package="csDEX", mustWork=TRUE)
+design.file = system.file("extdata/metadata.tsv", 
+    package="csDEX", mustWork=TRUE)
+data.dir.psi = system.file("extdata/psi", 
+    package="csDEX", mustWork=TRUE)
+data.dir.count = system.file("extdata/count", 
+    package="csDEX", mustWork=TRUE)
 ```
 
-Running the PSI model
+### The PSI model
 
 The percentage-spliced in model is based on Beta regression GLM. Is is somewhat
 more streamlined and therefore presented first.  The data is loaded into a
 csDEXDataSet object:
 
-```{r}
-    cdx = csDEXdataSet(data.dir=data.dir.psi, 
-                       design.file=design.file, 
-                       type="PSI",
-                       aggregation=mean)
+```{r, message=FALSE}
+cdx = csDEXdataSet(data.dir=data.dir.psi, 
+                   design.file=design.file, 
+                   type="PSI",
+                   aggregation=mean)
 ```
 
-The `aggregation` parameter is a function determining how to merge replicate
+The `aggregation` argument is a function determining how to merge replicate
 measurements associated to a feature.  Other functions, e.g. `sum`, `max`,
 `min`, ..., are possible, as well as custom ones. The metadata associated to
 rows and columns can be viewed or modified using `rowData(cdx)` and
@@ -139,23 +146,71 @@ complete list of preprocessing and filtering options.
 
 The differential feature expression is run with:
 
-```{r}
-    result = csd.testForDEU(cdx, 
-        workers=1, 
-        tmp.dir=NULL)
+```{r eval=FALSE}
+result = csd.testForDEU(cdx, 
+    workers=1, 
+    tmp.dir=NULL)
 ```
 
 The result is table of features and conditions ranked by statistical
 significance, where the columns `pvalue`, `padj` (Bonferroni correction) and
-`fdr` (Benjamini-Hochberg correction) are of interest.
+`fdr` (Benjamini-Hochberg correction) are of interest. The argument `tmp.dir`
+can be set to a valid system path where intermediary results will be stored
+(one file per gene), which is useful for lengthy computations. The `workers`
+parameter can be used to increase the number of processing cores, if available.
 
 
-
-Running the read count model
+### The read count model
 
 The read count model is based on Negative binomial regression. It requires 2-3
 extra preprocessing steps to infer model hyperparameters. 
 
 
+Data is loaded similarly as for the PSI model. Note the `type` argument.
 
+```{r message=FALSE}
+cdx = csDEXdataSet(data.dir=data.dir.count, 
+    design.file=design.file, 
+    type="count")
+```
 
+The following methods act on a `csDEXdataSet` object, by adding new fields to `rowData` or `colData`.
+
+Due to possible unequal sequencing, size factors are computed.
+
+```{r}
+cdx = estimateSizeFactors(cdx)
+```
+
+Normalized count values can be accessed by setting the `normalized` parameter
+to `exprData`.
+
+```{r eval=FALSE}
+exprData(cdx, normalized=TRUE)
+```
+
+The NB model assumes the dispersion parameter (sometimes termed precision) to be known.
+csDEX uses the `edgeR` package method `estimateDisp(...)$tagwise.dispersion`, but custom
+dispersion models can be used.
+
+```{r}
+cdx = estimateDispersions(cdx)
+```
+
+Finally, gene-wise read coverage, expressed as counts-per-million reads (CPM)
+can be calculated, provided that a column name `input.read.count` is present
+and valid in the design file. This step is optional, but can be used to 
+filter out low coverage genes.
+
+```{r, results=1:10}
+cdx = estimateGeneCPM(cdx)
+cpmData(cdx)
+```
+
+Having computed all the hyperparameters, testing for differential
+usage is run. Note the `min.cpm` argument is set to filter out genes
+based on CPM, as described above.
+
+```{r eval=FALSE}
+result = csd.testForDEU(cdx, workers=1, tmp.dir=NULL, min.cpm=1)
+```
