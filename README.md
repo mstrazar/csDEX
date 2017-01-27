@@ -1,19 +1,8 @@
----
-  title: "csDEX vignette"
-date: "2017-01-27"
-output: rmarkdown::html_vignette
-vignette: >
-  %\VignetteIndexEntry{csDEX vignette}
-%\VignetteEngine{knitr::rmarkdown}
-\usepackage[utf8]{inputenc}
----
 
 
 # The csDEX package: Quick Start
 
   
-Build with R CMD Sweave vignettes/csdex_vignette.Rmd
- 
 csDEX (Condition-specific Differential Exon Expression) is a family of general
 linear models (GLMs), used to model differential splicing given a set of
 sequencing experiments based on RNA-seq. The methods assume tens to hundreds
