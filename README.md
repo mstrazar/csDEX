@@ -1,13 +1,3 @@
----
-  title: "csDEX vignette"
-date: "2017-01-28"
-output: rmarkdown::html_vignette
-vignette: >
-  %\VignetteIndexEntry{csDEX vignette}
-%\VignetteEngine{knitr::rmarkdown}
-\usepackage[utf8]{inputenc}
----
-
 
 # The csDEX package: Quick Start
 
