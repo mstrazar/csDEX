@@ -167,7 +167,7 @@ csDEXdataSet <- function(data.dir, design.file, type="count",
         # Merge data on read counts if available
         # Aggregated in the same manner than counts
         cond.lib.size = NULL
-        if (!is.null(design$input.read.count)){
+        if (!is.null(design$[, input.read.count])){
             cond.lib.size = aggregation(design[design[,col.condition] == cond, input.read.count])
             lib.sizes = c(lib.sizes, cond.lib.size)
         }
