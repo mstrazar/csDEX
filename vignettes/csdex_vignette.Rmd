@@ -30,7 +30,8 @@ Capabilities:
 
 Install the latest version hosted on GitHub:
 ```{r eval=FALSE}
-install.packages("http://www.github.com/mstrazar/csDEX/csDEX_1.0.tar.gz")
+require(devtools)
+install_github("mstrazar/csDEX")
 ```
 
 Test the installation:
