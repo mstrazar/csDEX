@@ -10,7 +10,7 @@
 \describe{
 
 \item{\code{signature(obj = "csDEXdataSet")}}{
-%%  ~~describe this method here~~
+  Access csDEXdataSet object data type (PSI or count).
 }
 }}
 \keyword{methods}

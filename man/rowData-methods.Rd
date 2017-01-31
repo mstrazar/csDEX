@@ -2,6 +2,8 @@
 \docType{methods}
 \alias{rowData-methods}
 \alias{rowData,csDEXdataSet-method}
+\alias{rowData<--methods}
+\alias{rowData<-,csDEXdataSet-method}
 \title{ ~~ Methods for Function \code{rowData}  ~~}
 \description{
  ~~ Methods for function \code{rowData}  ~~
@@ -10,8 +12,7 @@
 \describe{
 
 \item{\code{signature(obj = "csDEXdataSet")}}{
-%%  ~~describe this method here~~
+  The accessor function to access row (feature) metadata provided by the experiment data files.
 }
 }}
 \keyword{methods}
-\keyword{ ~~ other possible keyword(s) ~~ }

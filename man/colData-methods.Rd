@@ -2,6 +2,8 @@
 \docType{methods}
 \alias{colData-methods}
 \alias{colData,csDEXdataSet-method}
+\alias{colData<--methods}
+\alias{colData<-,csDEXdataSet-method}
 \title{ ~~ Methods for Function \code{colData}  ~~}
 \description{
  ~~ Methods for function \code{colData}  ~~
@@ -10,8 +12,7 @@
 \describe{
 
 \item{\code{signature(obj = "csDEXdataSet")}}{
-%%  ~~describe this method here~~
+  The accessor function to access column (condition) metadata provided by the experiment design file.
 }
 }}
 \keyword{methods}
-\keyword{ ~~ other possible keyword(s) ~~ }
