@@ -17,13 +17,13 @@ test_that("test csDEX dataset - input error", {
 test_that("test csDEX dataset - PSI (standard workflow)", {
   cdx = csDEXdataSet(data.dir=data.dir.psi, design.file=design.file, type="PSI")
   expect_s4_class(cdx, "csDEXdataSet")
-  result = csd.testForDEU(cdx, workers=1, tmp.dir=NULL)
+  result = testForDEU(cdx, workers=1, tmp.dir=NULL)
 })
 
 test_that("test csDEX dataset - PSI (reduced workflow with Wald test)", {
   cdx = csDEXdataSet(data.dir=data.dir.psi, design.file=design.file, type="PSI")
   expect_s4_class(cdx, "csDEXdataSet")
-  result = csd.testForDEU(cdx, workers=1, tmp.dir=NULL, alpha.wald=0.05)
+  result = testForDEU(cdx, workers=1, tmp.dir=NULL, alpha.wald=0.05)
 })
 
 test_that("test csDEX dataset - count (standard workflow)", {
@@ -39,24 +39,24 @@ test_that("test csDEX dataset - count (standard workflow)", {
   rowData(cdx) <- rowdata
   colData(cdx) <- coldata
   
-  cdx = estimateDispersions(cdx)
+  cdx = estimatePrecisions(cdx)
   cdx = estimateGeneCPM(cdx)
   cpm = cpmData(cdx)  
   cpmData(cdx) <- cpm
   
-  result = csd.testForDEU(cdx, workers=1, tmp.dir=NULL, min.cpm=1)
+  result = testForDEU(cdx, workers=1, tmp.dir=NULL, min.cpm=1)
 })
 
 test_that("test csDEX dataset - PSI (reduced workflow with Wald test)", {
   cdx = csDEXdataSet(data.dir=data.dir.psi, design.file=design.file, type="PSI")
   expect_s4_class(cdx, "csDEXdataSet")
-  result = csd.testForDEU(cdx, workers=1, tmp.dir=NULL, alpha.wald=0.05)
+  result = testForDEU(cdx, workers=1, tmp.dir=NULL, alpha.wald=0.05)
 })
 
 ### 2 worker workflows
 test_that("test csDEX dataset - PSI (standard workflow)", {
   cdx = csDEXdataSet(data.dir=data.dir.psi, design.file=design.file, type="PSI")
   expect_s4_class(cdx, "csDEXdataSet")
-  result = csd.testForDEU(cdx, workers=2, tmp.dir=NULL)
+  result = testForDEU(cdx, workers=2, tmp.dir=NULL)
 })
 

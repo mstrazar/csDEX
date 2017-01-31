@@ -10,7 +10,7 @@
 \describe{
 
 \item{\code{signature(obj = "csDEXdataSet")}}{
-%%  ~~describe this method here~~
+    Estimate the size factors hyperparameter for each feature by using the external DESeq2::estimateSizeFactorsForMatrix function. Required for normalization of samples with respect to sequencing depth and mandatory when fitting count models.
 }
 }}
 \keyword{methods}

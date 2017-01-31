@@ -1,19 +1,9 @@
-# require(methods)
-# require(DESeq2)
-# require(edgeR)
-# require(aod)
-# require(utils)
-# require(betareg)
-# require(reshape)
-# require(parallel)
-
-
 ### Class definition
 setClass("csDEXdataSet",
     slots=c(
-        dataType="character",    # Type of the dataset (count/PSI).
+        dataType="character",   # Type of the dataset (count/PSI).
         exprData="matrix",      # alias for either counts or PSI.
-        rowData="data.frame",   # bin names, dispersion, etc.
+        rowData="data.frame",   # bin names, precision, etc.
         colData="data.frame",   # design files on conditions
         cpmData="matrix"        # computed cpm per group (gene)
     ))
@@ -24,7 +14,7 @@ setGeneric("exprData", function(obj, normalized=FALSE) standardGeneric("exprData
 setMethod("exprData", "csDEXdataSet",
     function(obj, normalized=FALSE){
         if(normalized){
-            if(is.null(colData(obj)$size.factor)){
+            if(is.null(csDEX::colData(obj)$size.factor)){
                 message("Size factors not provided yet. Run estimateSizeFactors first.\n")
                 NULL
             } else {
@@ -71,19 +61,16 @@ setGeneric("estimateSizeFactors",
     function(obj) standardGeneric("estimateSizeFactors"))
 setMethod("estimateSizeFactors", "csDEXdataSet",
     function(obj) {
-        colData(obj)$size.factor = estimateSizeFactorsForMatrix(obj@exprData)
+        csDEX::colData(obj)$size.factor = DESeq2::estimateSizeFactorsForMatrix(obj@exprData)
         obj
         })
 
-# Return a csDEXdataSet with estimated dispersions
-setGeneric("estimateDispersions",
-    function(obj) standardGeneric("estimateDispersions"))
-setMethod("estimateDispersions", "csDEXdataSet",
-    function(obj) {
-      
-        # TODO: The value in rowData(obj)$dispersion is actually precision; To repair naming!!!
-        # IRLS works with precision, which is fine! 
-        rowData(obj)$dispersion = 1.0 / estimateDisp(obj@exprData)$tagwise.dispersion
+# Return a csDEXdataSet with estimated precisions
+setGeneric("estimatePrecisions",
+    function(obj) standardGeneric("estimatePrecisions"))
+setMethod("estimatePrecisions", "csDEXdataSet",
+    function(obj) {        
+        csDEX::rowData(obj)$precision = 1.0 / edgeR::estimateDisp(obj@exprData)$tagwise.dispersion
         obj
         })
 
@@ -98,19 +85,19 @@ setMethod("estimateGeneCPM", "csDEXdataSet",
             message("Design file must provide input.read.count (library size) per sample.\n")
             NULL
         } else {
-            expr = exprData(obj)
-            lib.size = colData(obj)$lib.size
-            cpms = cpm(expr, lib.size=lib.size)
+            expr = csDEX::exprData(obj)
+            lib.size = csDEX::colData(obj)$lib.size
+            cpms = edgeR::cpm(expr, lib.size=lib.size)
 
-            groups = unique(rowData(obj)$groupID)
+            groups = unique(csDEX::rowData(obj)$groupID)
             cpm.max = matrix(0, nrow=length(groups), ncol=ncol(expr))
             colnames(cpm.max) = colnames(expr)
             row.names(cpm.max) = groups
 
             for (i in 1:length(groups))
-                cpm.max[i, ] = apply(cpms[rowData(obj)$groupID == groups[i],], 2, max)
+                cpm.max[i, ] = apply(cpms[csDEX::rowData(obj)$groupID == groups[i],], 2, max)
 
-            cpmData(obj) = cpm.max
+            csDEX::cpmData(obj) = cpm.max
             obj}
         })
 
@@ -120,6 +107,7 @@ setMethod("estimateGeneCPM", "csDEXdataSet",
 csDEXdataSet <- function(data.dir, design.file, type="count",
         col.condition="Experiment.target",
         col.replicate="File.accession",
+        input.read.count="input.read.count",
         data.file.ext="txt",
         aggregation=NULL,
         min.bin.count=NULL,
@@ -180,7 +168,7 @@ csDEXdataSet <- function(data.dir, design.file, type="count",
         # Aggregated in the same manner than counts
         cond.lib.size = NULL
         if (!is.null(design$input.read.count)){
-            cond.lib.size = aggregation(design[design[,col.condition] == cond, "input.read.count"])
+            cond.lib.size = aggregation(design[design[,col.condition] == cond, input.read.count])
             lib.sizes = c(lib.sizes, cond.lib.size)
         }
 
@@ -241,7 +229,7 @@ csDEXdataSet <- function(data.dir, design.file, type="count",
     new("csDEXdataSet", exprData=exprData, rowData=rowData, colData=colData, dataType=type)
 }
 
-csd.waldTest <- function(mm0, model0, alpha=0.05){
+waldTest <- function(mm0, model0, alpha=0.05){
   # Wald test for Beta model coefficients
   # Reduce non-significant coefficients to zero for efficient computation
   beta0 = model0$coefficients$mean
@@ -253,7 +241,7 @@ csd.waldTest <- function(mm0, model0, alpha=0.05){
   
   # Test statistic
   for (i in 1:length(wald)){
-    w = wald.test(b=beta0[i], scores[i], T=1)
+    w = aod::wald.test(b=beta0[i], scores[i], T=1)
     wald[i] = w$result$chi2["P"]
   }
   
@@ -276,12 +264,8 @@ csd.waldTest <- function(mm0, model0, alpha=0.05){
 }
 
 
-csd.geneModel <- function(input, min.cpm=NULL, tmp.dir=NULL, dist="count", alpha.wald=NULL){
-    # Per-gene Likelihood ratio test, testing each exon and condition.
-    suppressPackageStartupMessages({
-        
-    })
-
+geneModel <- function(input, min.cpm=NULL, tmp.dir=NULL, dist="count", alpha.wald=NULL){
+  
     # Writing to file
     write.gene.file <- function(tmp.dir, results, gene){
         if(!is.null(tmp.dir)){
@@ -295,12 +279,12 @@ csd.geneModel <- function(input, min.cpm=NULL, tmp.dir=NULL, dist="count", alpha
     gene = rowdata$groupID[1]
 
     # Prepare a results data frame
-    results = melt(expr)
+    results = reshape::melt(expr)
     colnames(results) = c("featureID", "condition", "y")
     results = merge(results, rowdata, by="featureID")
     results$featureID = as.factor(results$featureID)
     results$testable = TRUE
-    results[, c("cpm", "pvalue", "padj", "residual", "loglik", "LR", "time", "nrow", "ncol", "msg")] = NA
+    results[, c("cpm", "pvalue", "padj", "residual", "loglik", "ddev", "time", "nrow", "ncol", "msg")] = NA
 
     # Check variance
     if(var(results$y) == 0){
@@ -330,15 +314,15 @@ csd.geneModel <- function(input, min.cpm=NULL, tmp.dir=NULL, dist="count", alpha
 
     # Fit null model and store coefficients for better initialization
     if(dist == "count"){
-        model0 = tryCatch(nbreg.fit(X=mm0, 
+        model0 = tryCatch(csDEX::nbreg.fit(X=mm0, 
                                    y=as.vector(results$y),
-                                   phi=results$dispersion, 
+                                   phi=results$precision, 
                                    tol=0.0001),
                   warning = function(w) w,
                   error = function(e) e)
     } else if(dist == "PSI"){
         model0 = tryCatch(
-                betareg.fit(x=mm0, y=as.vector(results$y)),
+                betareg::betareg.fit(x=mm0, y=as.vector(results$y)),
                 warning = function(w) w,
                 error = function(e) e)        
     }
@@ -363,7 +347,7 @@ csd.geneModel <- function(input, min.cpm=NULL, tmp.dir=NULL, dist="count", alpha
       mm1 = model.matrix(frm1, results)
     } else {
       # Zero coefficients merged into one column
-      wt.stats = csd.waldTest(mm0, model0, alpha=alpha.wald)
+      wt.stats = csDEX::waldTest(mm0, model0, alpha=alpha.wald)
       start.coefs = wt.stats$coef.prior
       mm1 = cbind(wt.stats$mm.prior, as.vector(results$interaction))
       colnames(mm1)[ncol(mm1)] = "interaction"
@@ -382,9 +366,9 @@ csd.geneModel <- function(input, min.cpm=NULL, tmp.dir=NULL, dist="count", alpha
         start.time = Sys.time()
         if(dist == "count"){
             coefs.nbinom.init = c(start.coefs, 0)
-            model1 = tryCatch(nbreg.fit(X = mm1,
+            model1 = tryCatch(csDEX::nbreg.fit(X = mm1,
                                        y=as.vector(results$y),
-                                       phi = results$dispersion, 
+                                       phi = results$precision, 
                                        tol=0.0001,
                                        beta.init = coefs.nbinom.init,
                                        verbose=FALSE),
@@ -394,8 +378,8 @@ csd.geneModel <- function(input, min.cpm=NULL, tmp.dir=NULL, dist="count", alpha
             coefs.beta.init = model0$coefficients
             coefs.beta.init$mean = c(start.coefs, 0)
             model1 = tryCatch(
-                betareg.fit(x=mm1, y=as.vector(results$y),
-                    control=betareg.control(start=coefs.beta.init)),
+                betareg::betareg.fit(x=mm1, y=as.vector(results$y),
+                    control=betareg::betareg.control(start=coefs.beta.init)),
                 warning = function(w) w,
                 error = function(e) e)
         }
@@ -406,16 +390,15 @@ csd.geneModel <- function(input, min.cpm=NULL, tmp.dir=NULL, dist="count", alpha
           next
         }
           
-        # TODO: this is actually difference in deviance, see Dobson, p. 87 ; correct naming!
-        # Compute likelihood ratio test statistic
+        # Compute difference of deviance (likelihood ratio) test statistic
         results$time[i] = Sys.time() - start.time
         results$loglik[i] = model1$loglik
 
         # Likelihood ratio-test pvalue
-        LR = 2 * (model1$loglik - model0$loglik)
-        results$LR[i] = LR
-        if (LR > 0){
-            results$pvalue[i] = 1.0 - pchisq(LR, 1)
+        ddev = 2 * (model1$loglik - model0$loglik)
+        results$ddev[i] = ddev
+        if (ddev > 0){
+            results$pvalue[i] = 1.0 - pchisq(ddev, 1)
         } else {
             results$pvalue[i] = 1
         }
@@ -432,29 +415,29 @@ csd.geneModel <- function(input, min.cpm=NULL, tmp.dir=NULL, dist="count", alpha
 }
 
 
-csd.testForDEU <- function(cdx, workers=1, tmp.dir=NULL, min.cpm=NULL, alpha.wald=NULL){
+testForDEU <- function(cdx, workers=1, tmp.dir=NULL, min.cpm=NULL, alpha.wald=NULL){
     # Test for differential exon usage given a csDEX data object file,
-    # with calculated dispersions and size factors. Only test genes
+    # with calculated precisions and size factors. Only test genes
     #   if they have any reads mapped onto them
 
-    gene.set = unique(rowData(cdx)$groupID)
+    gene.set = unique(csDEX::rowData(cdx)$groupID)
     inputs = list()
-    dist = dataType(cdx)
+    dist = csDEX::dataType(cdx)
     
     # Check input for NBINOM
     if(dist == "count"){
-        stopifnot(!is.null(colData(cdx)$size.factor))
-        stopifnot(!is.null(rowData(cdx)$dispersion))
+        stopifnot(!is.null(csDEX::colData(cdx)$size.factor))
+        stopifnot(!is.null(csDEX::rowData(cdx)$precision))
     }
 
     # Add to queue if gene has not equal count at all cells
     gene.cpm = NULL
     message("Constructing inputs ... \n")
     for (g in gene.set){
-        inxs = which(rowData(cdx)$groupID == g)
-        gene.expr = exprData(cdx, normalized=(dist=="count"))[inxs,]
-        gene.rowdata = rowData(cdx)[inxs,]
-        if(!is.null(min.cpm)) gene.cpm = cpmData(cdx)[g,]
+        inxs = which(csDEX::rowData(cdx)$groupID == g)
+        gene.expr = csDEX::exprData(cdx, normalized=(dist=="count"))[inxs,]
+        gene.rowdata = csDEX::rowData(cdx)[inxs,]
+        if(!is.null(min.cpm)) gene.cpm = csDEX::cpmData(cdx)[g,]
 
         inputs[[length(inputs)+1]] = list(expr=gene.expr, rowdata=gene.rowdata,
             gene.cpm=gene.cpm)
@@ -463,12 +446,12 @@ csd.testForDEU <- function(cdx, workers=1, tmp.dir=NULL, min.cpm=NULL, alpha.wal
     # If workers == 1, run within the same process
     if(workers > 1){
       message(sprintf("Dispatching on %d workers, cache directory %s. \n", workers, tmp.dir))
-      jobs = mclapply(inputs, csd.geneModel, min.cpm, tmp.dir, dist, alpha.wald,
+      jobs = mclapply(inputs, csDEX::geneModel, min.cpm, tmp.dir, dist, alpha.wald,
           mc.preschedule=FALSE, mc.cores=workers, mc.silent=TRUE)
     } else {
       jobs = list()
       for(inp in inputs) 
-        jobs[[length(jobs)+1]] = csd.geneModel(inp, min.cpm, tmp.dir, dist, alpha.wald)
+        jobs[[length(jobs)+1]] = csDEX::geneModel(inp, min.cpm, tmp.dir, dist, alpha.wald)
     }
 
     results = data.frame()

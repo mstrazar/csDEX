@@ -162,7 +162,7 @@ complete list of preprocessing and filtering options.
 The differential feature expression is run with:
 
 ```{r eval=TRUE, message=FALSE}
-result = csd.testForDEU(cdx, 
+result = testForDEU(cdx, 
     workers=1, 
     tmp.dir=NULL)
 ```
@@ -208,12 +208,12 @@ to `exprData`.
 exprData(cdx, normalized=TRUE)
 ```
 
-The NB model assumes the dispersion parameter (sometimes termed precision) to be known.
+The NB model assumes the precision parameter (sometimes termed precision) to be known.
 csDEX uses the `edgeR` package method `estimateDisp(...)$tagwise.dispersion`, but custom
-dispersion models can be used.
+precision models can be used.
 
 ```{r message=FALSE}
-cdx = estimateDispersions(cdx)
+cdx = estimatePrecisions(cdx)
 ```
 
 Finally, gene-wise read coverage, expressed as counts-per-million reads (CPM)
@@ -231,7 +231,7 @@ usage is run. Note the `min.cpm` argument is set to filter out genes
 based on CPM, as described above.
 
 ```{r message=FALSE}
-result = csd.testForDEU(cdx, workers=1, tmp.dir=NULL, min.cpm=1)
+result = testForDEU(cdx, workers=1, tmp.dir=NULL, min.cpm=1)
 ```
 
 ```{r}
