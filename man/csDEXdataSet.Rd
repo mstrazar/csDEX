@@ -6,7 +6,8 @@ Object to store a csDEX dataset.
 %%  ~~function to do ... ~~
 }
 \description{
-%%  ~~ A concise (1-5 lines) description of what the function does. ~~
+Initialize and instance of the csDEXdataSet object, by constructing a
+feature-by-condition data matrix with associated metadata.
 }
 \usage{
 csDEXdataSet(data.dir, design.file, type = "count", col.condition = "Experiment.target", col.replicate = "File.accession", data.file.ext = "txt", aggregation = NULL, min.bin.count = NULL, min.gene.count = NULL, zero.out = NULL)
@@ -14,57 +15,78 @@ csDEXdataSet(data.dir, design.file, type = "count", col.condition = "Experiment.
 %- maybe also 'usage' for other objects documented here.
 \arguments{
   \item{data.dir}{
-%%     ~~Describe \code{data.dir} here~~
+    The directory containing the replicate (data) files.
 }
   \item{design.file}{
-%%     ~~Describe \code{design.file} here~~
+    The design file with one line per replicate. Needs to contain at least two
+columns, denoting file name (default: "File.accession") and
+condition name (default: "Experiment.target"). A third, optional column can be
+included to denote total read counts associated to a replicate (default:
+"input.read.count"). Other columns can be stored, but will not be used by
+csDEX.
 }
   \item{type}{
-%%     ~~Describe \code{type} here~~
+    Data type, either "PSI" (percent-spliced in) or "count" (read counts).
 }
   \item{col.condition}{
-%%     ~~Describe \code{col.condition} here~~
+    Name of the column in the design file denoting the experimental condition.
 }
   \item{col.replicate}{
-%%     ~~Describe \code{col.replicate} here~~
+    Name of the column in the design file denoting unique file identifiers
+(without extension).
 }
   \item{data.file.ext}{
-%%     ~~Describe \code{data.file.ext} here~~
+    Replicate files extension (default: "txt").
 }
   \item{aggregation}{
-%%     ~~Describe \code{aggregation} here~~
+    Replicate aggregation function. A pointer to a function for merging values
+of replicates into one per each sample (default: mean).
+    
 }
   \item{min.bin.count}{
-%%     ~~Describe \code{min.bin.count} here~~
+    Minimum value at a feature to be considered non-zero. If defined, values
+below this threshold will be set to zero.
 }
   \item{min.gene.count}{
-%%     ~~Describe \code{min.gene.count} here~~
+    Minimum sum of expression values accross a gene to be considered expressed.
+If defined, all the features associated to the gene will be set to zero.
 }
-  \item{zero.out}{
-%%     ~~Describe \code{zero.out} here~~
+
+\item{zero.out}{
+    Use for PSI data to prevent PSI being not equal to either 0 or 1 for constitutive features. 
+    If feature value is less than min.count, it is set to NA and ignored by the aggregation function.
 }
+
 }
 \details{
-%%  ~~ If necessary, more details than the description above ~~
+    The main task of this function is to construct a csDEXdataSet object by
+aggregating the replicate data into one column per sample. Arbitrary
+aggregation functions can be passed, the most common ones being mean, sum and
+max. The options min.bin.count, min.gene.count and zero.out can be used for filtering.
+
+All metadata provided by the design file is stored in the object colData. The
+two mandatory columns are specified by col.condition and col.replicate, as
+defined above. The total experiment read count can be provided along with each
+replicate, to enable usage of estiamteGeneCPM function in the downstream
+analysis.
+
+The row metadata is parsed as featureID (individual regions of interest) and groupID (gene).
+
 }
 \value{
-%%  ~Describe the value returned
-%%  If it is a LIST, use
-%%  \item{comp1 }{Description of 'comp1'}
-%%  \item{comp2 }{Description of 'comp2'}
-%% ...
+An initialized csDEXdataSet object.
 }
+
 \references{
 %% ~put references to the literature/web site here ~
 }
 \author{
-%%  ~~who you are~~
+Martin Stražar.
 }
 \note{
 %%  ~~further notes~~
 }
 
-%% ~Make other sections like Warning with \section{Warning }{....} ~
 
 \seealso{
 %% ~~objects to See Also as \code{\link{help}}, ~~~

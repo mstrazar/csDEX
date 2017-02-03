@@ -21,7 +21,7 @@ experimental condition.
 
 Capabilities:
 * handling of sequence data in form of read counts or percentages (e.g. percent-spliced in, PSI),
-* modelling all type of splicing events,
+* modelling all types of splicing events,
 * discovery and ranking of condition-specific changes,
 * parallel processing of multiple genes (groups),
 * time-efficient model approximation with no change in false positive rate.
