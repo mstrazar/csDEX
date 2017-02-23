@@ -5,7 +5,6 @@ data.dir.psi = system.file("extdata/psi", package="csDEX", mustWork=TRUE)
 data.dir.count = system.file("extdata/count", package="csDEX", mustWork=TRUE)
 
 ### Test loading
-
 test_that("test csDEX dataset - input error", {
   expect_error(
     csDEXdataSet(data.dir=NULL, design.file=NULL, type="")

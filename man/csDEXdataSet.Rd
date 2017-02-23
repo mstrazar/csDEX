@@ -20,9 +20,11 @@ csDEXdataSet(data.dir, design.file, type = "count", col.condition = "Experiment.
   \item{design.file}{
     The design file with one line per replicate. Needs to contain at least two
 columns, denoting file name (default: "File.accession") and
-condition name (default: "Experiment.target"). A third, optional column can be
+condition name (default: "Experiment.target"). An optional column can be
 included to denote total read counts associated to a replicate (default:
-"input.read.count"). Other columns can be stored, but will not be used by
+"input.read.count"). Also, an optional binary column (default: "testable") 
+can be used to test only selected conditions.
+Other columns can be stored, but will not be used by
 csDEX.
 }
   \item{type}{

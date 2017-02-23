@@ -107,6 +107,7 @@ setMethod("estimateGeneCPM", "csDEXdataSet",
 csDEXdataSet <- function(data.dir, design.file, type="count",
         col.condition="Experiment.target",
         col.replicate="File.accession",
+        col.testable="testable",
         input.read.count="input.read.count",
         data.file.ext="txt",
         aggregation=NULL,
@@ -158,6 +159,8 @@ csDEXdataSet <- function(data.dir, design.file, type="count",
 
     exprData = NULL
     lib.sizes = NULL
+    testable = rep(TRUE, n.con)
+    
     for (i in 1:length(conditions)){
         cond = conditions[i]
         message(sprintf("Condition %s", cond))
@@ -167,11 +170,16 @@ csDEXdataSet <- function(data.dir, design.file, type="count",
         # Merge data on read counts if available
         # Aggregated in the same manner than counts
         cond.lib.size = NULL
-        if (!is.null(design[, input.read.count])){
+        if (input.read.count %in% colnames(design)){
             cond.lib.size = aggregation(design[design[,col.condition] == cond, input.read.count])
             lib.sizes = c(lib.sizes, cond.lib.size)
         }
-
+        
+        # Information on testability if available.
+        if (col.testable %in% colnames(design)){
+          testable[i] = as.logical(sum(design[design[,col.condition] == cond, col.testable]))
+        }
+        
         # Merge data on replicates
         repData = NULL
         n.rep = length(replicates)
@@ -225,6 +233,7 @@ csDEXdataSet <- function(data.dir, design.file, type="count",
 
     colData = data.frame(condition=colnames(exprData))
     if(!is.null(lib.sizes)) colData$lib.size = lib.sizes
+    colData$testable = testable
 
     new("csDEXdataSet", exprData=exprData, rowData=rowData, colData=colData, dataType=type)
 }
@@ -276,6 +285,7 @@ geneModel <- function(input, min.cpm=NULL, tmp.dir=NULL, dist="count", alpha.wal
     # Extract input values
     expr = input$expr
     rowdata = input$rowdata
+    coldata = input$coldata
     gene = rowdata$groupID[1]
 
     # Prepare a results data frame
@@ -283,7 +293,7 @@ geneModel <- function(input, min.cpm=NULL, tmp.dir=NULL, dist="count", alpha.wal
     colnames(results) = c("featureID", "condition", "y")
     results = merge(results, rowdata, by="featureID")
     results$featureID = as.factor(results$featureID)
-    results$testable = TRUE
+    results$testable = coldata[results$condition, "testable"]
     results[, c("cpm", "pvalue", "padj", "residual", "loglik", "ddev", "time", "nrow", "ncol", "msg")] = NA
 
     # Check variance
@@ -439,8 +449,10 @@ testForDEU <- function(cdx, workers=1, tmp.dir=NULL, min.cpm=NULL, alpha.wald=NU
         gene.rowdata = csDEX::rowData(cdx)[inxs,]
         if(!is.null(min.cpm)) gene.cpm = csDEX::cpmData(cdx)[g,]
 
-        inputs[[length(inputs)+1]] = list(expr=gene.expr, rowdata=gene.rowdata,
-            gene.cpm=gene.cpm)
+        inputs[[length(inputs)+1]] = list(expr=gene.expr, 
+                                          rowdata=gene.rowdata, 
+                                          coldata=csDEX::colData(cdx),
+                                          gene.cpm=gene.cpm)
     }
     
     # If workers == 1, run within the same process
