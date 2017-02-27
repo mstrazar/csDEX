@@ -236,7 +236,7 @@ csDEXdataSet <- function(data.dir, design.file, type="count",
     row.names(rowData) = rowData$featureID
 
     colData = data.frame(condition=colnames(exprData))
-    colnames(colData) <- colData$condition
+    row.names(colData) <- colData$condition
     if(!is.null(lib.sizes)) colData$lib.size = lib.sizes
     colData$testable = testable
 
