@@ -61,7 +61,11 @@ setGeneric("estimateSizeFactors",
     function(obj) standardGeneric("estimateSizeFactors"))
 setMethod("estimateSizeFactors", "csDEXdataSet",
     function(obj) {
-        csDEX::colData(obj)$size.factor = DESeq2::estimateSizeFactorsForMatrix(obj@exprData)
+        csDEX::colData(obj)$size.factor = tryCatch(DESeq2::estimateSizeFactorsForMatrix(obj@exprData),
+                                                   error=function(e){
+                                                     warning("Using edgeR:calcNormFactors ")
+                                                     1.0 / c(edgeR::calcNormFactors(obj@exprData))
+                                                   })
         obj
         })
 
@@ -232,6 +236,7 @@ csDEXdataSet <- function(data.dir, design.file, type="count",
     row.names(rowData) = rowData$featureID
 
     colData = data.frame(condition=colnames(exprData))
+    colnames(colData) <- colData$condition
     if(!is.null(lib.sizes)) colData$lib.size = lib.sizes
     colData$testable = testable
 
@@ -294,7 +299,7 @@ geneModel <- function(input, min.cpm=NULL, tmp.dir=NULL, dist="count", alpha.wal
     results = merge(results, rowdata, by="featureID")
     results$featureID = as.factor(results$featureID)
     results$testable = coldata[results$condition, "testable"]
-    results[, c("cpm", "pvalue", "padj", "residual", "loglik", "ddev", "time", "nrow", "ncol", "msg")] = NA
+    results[, c("cpm", "pvalue", "fdr", "fdr.all", "padj", "residual", "loglik", "ddev", "time", "nrow", "ncol", "msg")] = NA
 
     # Check variance
     if(var(results$y) == 0){
@@ -417,6 +422,7 @@ geneModel <- function(input, min.cpm=NULL, tmp.dir=NULL, dist="count", alpha.wal
     # Correct for multiple testing
     results$interaction = NULL
     results$padj = p.adjust(results$pvalue, method="bonferroni")
+    results$fdr = p.adjust(results$pvalue, method="BH")
     results = results[order(results$pvalue),]
 
     # Write intermediate results
@@ -471,7 +477,8 @@ testForDEU <- function(cdx, workers=1, tmp.dir=NULL, min.cpm=NULL, alpha.wald=NU
         if (!class(jobs[[i]]) == "try-error")
             results = rbind(results, jobs[[i]])
     }
-
+    
+    results$fdr.all = p.adjust(results$pvalue, "BH")
     results=results[order(results$pvalue),]
     return(results)
 }
