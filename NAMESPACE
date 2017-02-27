@@ -11,9 +11,7 @@ exportMethods(
     "exprData",
     "exprData<-",
     "rowData",
-    "rowData<-",
-    "generate"
-)
+    "rowData<-")
 exportClasses(
     "csDEXdataSet" 
 )
