@@ -311,7 +311,7 @@ geneModel <- function(input, min.cpm=NULL, tmp.dir=NULL, dist="count", alpha.wal
     # Define testability based on min.cpm
     if(!is.null(min.cpm)){
         gene.cpm = input$gene.cpm
-        results$testable = gene.cpm[as.character(results$condition)] >= min.cpm
+        results$testable = results$testable & (gene.cpm[as.character(results$condition)] >= min.cpm)
         results$cpm = gene.cpm[as.character(results$condition)]
         results[results$cpm < min.cpm, "msg"] = "low cpm"
     }
