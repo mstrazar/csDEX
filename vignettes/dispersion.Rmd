@@ -1,0 +1,98 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+
+
+
+```{r}
+require(csDEX)
+require(DEXSeq)
+data.dir = "/Users/martin/Desktop/csdex-temp/"
+```
+
+
+```{r}
+precision.csdex <- function(obj){
+  cdx = obj$data
+  cdx = csDEX::estimateSizeFactors(cdx)
+  cdx = csDEX::estimatePrecisions(cdx)
+  prec = csDEX::rowData(cdx)$precision
+  names(prec) = row.names(csDEX::rowData(cdx))
+  prec
+}
+```
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Cmd+Shift+Enter*. 
+
+
+```{r}
+precision.dexseq <- function(obj){
+    sampleData = obj$design
+    countfiles = file.path(obj$data.dir, "data", paste0(sampleData$File.accession, ".txt"))
+    dex = DEXSeqDataSetFromHTSeq(
+      countfiles = countfiles,
+      sampleData = sampleData)
+    dex = DEXSeq::estimateSizeFactors(dex)
+    dex = DEXSeq::estimateDispersions(dex)
+    prec = 1.0/dispersions(dex)
+    names(prec) = sprintf("%s:%s", 
+                          DEXSeq::groupIDs(dex), 
+                          gsub(":E", ":", DEXSeq::featureIDs(dex)))
+    prec
+}
+```
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Cmd+Option+I*.
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Cmd+Shift+K* to preview the HTML file).
+
+```{r, message=FALSE, warning=FALSE}
+    obj = generate(exons=16, conditions=20, 
+                   interacting=0, replicates=2, genes=1, 
+                   type="count", data.dir=data.dir, seed=NULL)  
+    p.dex = precision.dexseq(obj)
+    p.cdx = precision.csdex(obj)
+    
+    inxs = rev(order(obj$precisions))
+    plot(obj$precisions[inxs], type="l", col="black", xlab="Exon", ylab="Precision")
+    lines(p.dex[inxs], col="blue")
+    lines(p.cdx[inxs], col="orange")
+    legend("topright", legend=c("True", "csDEX", "DEXSeq"), col=c("black", "orange", "blue"), lty = 1)
+```
+
+Let's generate a fixed vector of precisions.
+
+```{r, message=FALSE, warning=FALSE}
+features = 20
+dispersions = rgamma(features, 1, 2)
+precisions = 1.0 / dispersions
+conditions = c(3, 5, 10)
+repeats = 10
+conditions = 5
+
+est.cdx = matrix(0, nrow=repeats, ncol=features)
+est.dex = matrix(0, nrow=repeats, ncol=features)
+for (r in 1:repeats){
+  obj = generate(exons=features, conditions=conditions, 
+                   interacting=0, replicates=10, genes=1, 
+                   dispersions=dispersions,
+                   type="count", data.dir=data.dir, seed=NULL)
+  
+  est.cdx[r,] = precision.csdex(obj)
+  est.dex[r,] = precision.dexseq(obj)
+}
+
+mean.cdx = colMeans(est.cdx)
+mean.dex = colMeans(est.dex)
+
+inxs = rev(order(obj$precisions))
+plot(obj$precisions[inxs], type="l", col="black", xlab="Exon", ylab="Precision")
+lines(mean.dex[inxs], col="blue")
+lines(mean.cdx[inxs], col="orange")
+
+```
+
