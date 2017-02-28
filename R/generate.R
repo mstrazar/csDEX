@@ -1,7 +1,7 @@
 # Generate a synthetic csDEX dataset
 # TODO: add unit tests
 generate <- function(exons=16, conditions=20, interacting=2, replicates=2, genes=2, 
-                     type="count", data.dir=NULL, seed=NULL){
+                     type="count", data.dir=NULL, seed=NULL, dispersions=NULL){
     
   # Internal functions to manipulate the Beta distribution
   muvarToAlpha <- function(mu, var) {
@@ -37,7 +37,8 @@ generate <- function(exons=16, conditions=20, interacting=2, replicates=2, genes
   # Latent parameters - count
   beta_ex      = runif(exons*genes, -1, 2)
   beta_con     = runif(conditions,  -1, 2)
-  dispersions  = rgamma(exons*genes, 1, 2)
+  if(is.null(dispersions)) 
+    dispersions  = rgamma(exons*genes, 1, 2)
   precisions   = 1.0 / dispersions
   size.factors = rgamma(conditions, 1, 2)
   
@@ -127,6 +128,8 @@ generate <- function(exons=16, conditions=20, interacting=2, replicates=2, genes
     ints = ints[order(ints$value),]
     colnames(ints) = c("featureID", "condition", "interaction")
     row.names(ints) = sprintf("%s:%s", ints$featureID, ints$condition)
+    names(dispersions) = exons_genes
+    names(precisions) = exons_genes
     
     write.table(as.data.frame(beta_ex), 
                 file.path(pars.dir, "beta_ex.tab"), sep="\t", row.names=exons_genes)
