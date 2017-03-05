@@ -1,7 +1,7 @@
 # Generate a synthetic csDEX dataset
 # TODO: add unit tests
 generate <- function(exons=16, conditions=20, interacting=2, replicates=2, genes=2, 
-                     type="count", data.dir=NULL, seed=NULL, dispersions=NULL){
+  type="count", data.dir=NULL, seed=NULL, dispersions=NULL){
     
   # Internal functions to manipulate the Beta distribution
   muvarToAlpha <- function(mu, var) {
@@ -57,7 +57,8 @@ generate <- function(exons=16, conditions=20, interacting=2, replicates=2, genes
     I[ix[k], iy[k]] = sample(c(runif(1, -8, -6), runif(1, 1, 2)), 1)
   
   # Observable parameters in multiple replicates
-  X = array(0, c(replicates, exons * genes, conditions))  # Observables
+  # max is used to allow generating one replicate
+  X = array(0, c(max(2, replicates), exons * genes, conditions))  # Observables
   for (r in 1:replicates){
     for (i in 1:(exons * genes)){
       for (j in 1:conditions){
@@ -76,17 +77,15 @@ generate <- function(exons=16, conditions=20, interacting=2, replicates=2, genes
         }
       }}}
   
-  if(type == "count"){
-    # Increase counts by one in each row and column in one random cell
-    for (r in 1:replicates){
-      for (j in 1:conditions){i = sample(1:exons*genes, 2) ; X[r, i, j] = X[r, i, j] + 1;}
-      for (i in 1:(genes*exons)){j = sample(1:conditions, 2) ; X[r, i, j] = X[r, i, j] + 1;}
-    }
-    stopifnot(prod(colSums(X[1,,]))>0)
-    stopifnot(prod(colSums(X[2,,]))>0)
-    stopifnot(prod(rowSums(X[1,,]))>0)
-    stopifnot(prod(rowSums(X[2,,]))>0)
-  }
+  # if(type == "count"){
+  #   # Increase counts by one in each row and column in one random cell
+  #   for (r in 1:replicates){
+  #     for (j in 1:conditions){i = sample(1:exons*genes, 2) ; X[r, i, j] = X[r, i, j] + 1;}
+  #     for (i in 1:(genes*exons)){j = sample(1:conditions, 2) ; X[r, i, j] = X[r, i, j] + 1;}
+  #   }
+  #   stopifnot(prod(colSums(X[1,,]))>0)
+  #   stopifnot(prod(rowSums(X[1,,]))>0)
+  # }
   
   # Create metadata and store to disk
   cdx = NULL
@@ -147,7 +146,8 @@ generate <- function(exons=16, conditions=20, interacting=2, replicates=2, genes
     # Construct dataset
     cdx = csDEXdataSet(data.dir=file.path(data.dir, "data"), 
                        design.file=file.path(data.dir, "metadata.tsv"), 
-                       type=type)
+                       type=type,
+                       aggregation=sum)
   }
   
   # Return a constructed synthetic dataset  
