@@ -2,34 +2,41 @@
 title: "R Notebook"
 output: html_notebook
 ---
+ 
 
-
-
+The notebook reproduces the comparison of dispersion fitting in the csDEX article (Stražar & Curk, 2017),
+Figure 1.x, Supplementary Figure 1.x. For this experiment, csDEX and DEXSeq packages are required. A temporary directory is created in the current working directory.
 
 ```{r, message=FALSE, warning=FALSE}
 require(csDEX)
 require(DEXSeq)
-data.dir = "/Users/martin/Desktop/csdex-temp/"
+data.dir = file.path(getwd(), "csdex-temp/")
 ```
 
 
+The terminology csDEX package estimates precisions (inverse dispersions), to keep a consistent terminology for both count and Percent Spliced-in (PSI) models, based on negative binomial and Beta distributions, respectively. Since csDEX assumes `sum` as the default replicate aggregation function, 
+the estimated dispersion is multiplied by the number of replicates for correct comparison.
+
 ```{r}
-dispersion.csdex <- function(obj){
+dispersion.csdex <- function(obj, nreps=1){
+  # obj: a list returned by the csDEX::generate function
+  # nreps: number of replicates
   cdx = obj$data
   cdx = csDEX::estimateSizeFactors(cdx)
   cdx = csDEX::estimatePrecisions(cdx)
-  disp = 1.0 / csDEX::rowData(cdx)$precision
+  disp = nreps / csDEX::rowData(cdx)$precision
   return(disp)
 }
 ```
 
-This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
 
-Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Cmd+Shift+Enter*. 
 
+Estimating dispersion with DEXSeq (Anders et. al, 2012) is also straightforward. The count files are loaded from disk and a standard workflow is used to first estimate the size factors (differences in sample means due to sequencing depth) and the using the Cox-Reid dispersion estimate. 
 
 ```{r}
 dispersion.dexseq <- function(obj){
+    # obj: a list returned by the csDEX::generate function
+    # nreps: number of replicates
     sampleData = obj$design
     countfiles = file.path(obj$data.dir, "data", paste0(sampleData$File.accession, ".txt"))
     dex = DEXSeqDataSetFromHTSeq(
@@ -43,47 +50,59 @@ dispersion.dexseq <- function(obj){
 ```
 
 
-Let's generate a fixed vector of precisions.
+
+Generate a dataset with a fixed vector of `dispersions`. The values are the same for each of the `repeats`, enabling to compute mean predictions and standard deviations. The DEXSeq dispersion fitting can fail in the case of a large number of zero counts. 
 
 ```{r, message=FALSE, warning=FALSE}
-features = 20
-# dispersions = 1.0/runif(features, 0.1, 20)  # Dispersions mus span multiple orders of magnitude
-dispersions = rgamma(features, 1, 2)
-dispersions = dispersions[order(dispersions)]
-conditions = c(3, 5, 10)
-repeats = 5
-conditions = 10 # Large number of conditions is essential for the fit to work
+conditions = 50
+exons = 20
+repeats = 10
+replicates = 3
 
-est.cdx = matrix(0, nrow=repeats, ncol=features)
-est.dex = matrix(0, nrow=repeats, ncol=features)
+dispersions = rev(sort(rgamma(exons, 1, 2.5)))
+
+est.cdx = matrix(0, nrow=repeats, ncol=exons)
+est.dex = matrix(0, nrow=repeats, ncol=exons)
 for (r in 1:repeats){
-  obj = generate(exons=features, conditions=conditions, 
-                   interacting=0, replicates=2, genes=1, 
+  obj = generate(exons=exons, conditions=conditions, 
+                   interacting=0, replicates=replicates, genes=1, 
                    dispersions = dispersions,
-                   type="count", data.dir=data.dir, seed=NULL)
+                   type="count", data.dir=data.dir)
   
-  est.cdx[r,] = dispersion.csdex(obj)
-  est.dex[r,] = dispersion.dexseq(obj)
+  est.cdx[r,] = dispersion.csdex(obj, replicates)
+  est.dex[r,] = tryCatch(dispersion.dexseq(obj), 
+                          error=function(e) rep(NA, exons))
 }
+```
+  
+  
 
-
-# Plot the fits
-x = 1:features
-mean.cdx = colMeans(est.cdx)
-std.cdx = apply(est.cdx, 2, sd)
-down.cdx = mean.cdx + std.cdx
-up.cdx = mean.cdx - std.cdx
-
-mean.dex = colMeans(est.dex)
-std.dex = apply(est.dex, 2, sd)
-down.dex = mean.dex + std.dex
-up.dex = mean.dex - std.dex
-
-inxs = rev(order(obj$precisions))
-plot(dispersions, type="l", col="black", xlab="Exon", ylab="Dispersion")
-lines(mean.cdx, col="orange")
-lines(mean.dex, col="blue")
-polygon(c(x, rev(x)), c(up.cdx, rev(down.cdx)), col=rgb(1,0,0,0.2), border=NA)
-polygon(c(x, rev(x)), c(up.dex, rev(down.dex)), col=rgb(0,0,1,0.2), border=NA)
+Compute means and stadard deviations. Finally, compare the fits on a plot and compute root mean square errors. Observe the error decreasing with a larger number of experimental conditions.
+  
+```{r}
+  x = 1:features
+  mean.cdx = colMeans(est.cdx)
+  std.cdx = apply(est.cdx, 2, sd)
+  down.cdx = mean.cdx + std.cdx
+  up.cdx = mean.cdx - std.cdx
+  rmse.cdx = sqrt(sum((mean.cdx - dispersions)^2))
+  
+  mean.dex = colMeans(est.dex, na.rm=TRUE)
+  std.dex = apply(est.dex, 2, sd, na.rm=TRUE)
+  down.dex = mean.dex + std.dex
+  up.dex = mean.dex - std.dex
+  rmse.dex = sqrt(sum((mean.dex - dispersions)^2))
+  
+  pdf(sprintf("/Users/martin/Desktop/dispersions/dispersions_ncon-%d.pdf", conditions), width=3.38, height=3.38)
+  plot(dispersions, type="l", col="black", xlab="Exon", ylab="Dispersion")
+  op = par(cex = 0.8)
+  lines(mean.cdx, col="orange")
+  lines(mean.dex, col="blue")
+  polygon(c(x, rev(x)), c(up.cdx, rev(down.cdx)), col=rgb(1,0,0,0.2), border=NA)
+  polygon(c(x, rev(x)), c(up.dex, rev(down.dex)), col=rgb(0,0,1,0.2), border=NA)
+  legend("topright", inset=.01, 
+         c(sprintf("qCML (%.2f)", rmse.cdx), sprintf("Cox-Reid (%.2f)", rmse.dex)),   
+         fill=c("orange", "blue"), bty="n")
+  dev.off()
 ```
 
