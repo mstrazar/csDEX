@@ -29,6 +29,11 @@ generate <- function(exons=16, conditions=20, interacting=2, replicates=2, genes
     phi * (1 - mu)
   }
   
+  inv.logit <- function(nu){
+    # Inverse logit function
+    as.numeric(exp(nu) / (1 + exp(nu)))
+  }
+  
   # Input check
   stopifnot(type %in% c("PSI", "count"))
   stopifnot(conditions >= 2)
@@ -76,16 +81,6 @@ generate <- function(exons=16, conditions=20, interacting=2, replicates=2, genes
           X[r, i, j] = rbeta(1, shape1=alphas[i, j], shape2=betas[i, j])
         }
       }}}
-  
-  # if(type == "count"){
-  #   # Increase counts by one in each row and column in one random cell
-  #   for (r in 1:replicates){
-  #     for (j in 1:conditions){i = sample(1:exons*genes, 2) ; X[r, i, j] = X[r, i, j] + 1;}
-  #     for (i in 1:(genes*exons)){j = sample(1:conditions, 2) ; X[r, i, j] = X[r, i, j] + 1;}
-  #   }
-  #   stopifnot(prod(colSums(X[1,,]))>0)
-  #   stopifnot(prod(rowSums(X[1,,]))>0)
-  # }
   
   # Create metadata and store to disk
   cdx = NULL
@@ -146,8 +141,7 @@ generate <- function(exons=16, conditions=20, interacting=2, replicates=2, genes
     # Construct dataset
     cdx = csDEXdataSet(data.dir=file.path(data.dir, "data"), 
                        design.file=file.path(data.dir, "metadata.tsv"), 
-                       type=type,
-                       aggregation=sum)
+                       type=type)
   }
   
   # Return a constructed synthetic dataset  
