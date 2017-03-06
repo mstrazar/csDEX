@@ -61,11 +61,7 @@ setGeneric("estimateSizeFactors",
     function(obj) standardGeneric("estimateSizeFactors"))
 setMethod("estimateSizeFactors", "csDEXdataSet",
     function(obj) {
-        csDEX::colData(obj)$size.factor = tryCatch(DESeq2::estimateSizeFactorsForMatrix(obj@exprData),
-                                                   error=function(e){
-                                                     warning("Using edgeR:calcNormFactors ")
-                                                     1.0 / c(edgeR::calcNormFactors(obj@exprData))
-                                                   })
+        csDEX::colData(obj)$size.factor = 1.0 / c(edgeR::calcNormFactors(obj@exprData))
         obj
         })
 
@@ -74,7 +70,8 @@ setGeneric("estimatePrecisions",
     function(obj) standardGeneric("estimatePrecisions"))
 setMethod("estimatePrecisions", "csDEXdataSet",
     function(obj) {        
-        csDEX::rowData(obj)$precision = 1.0 / edgeR::estimateDisp(obj@exprData)$tagwise.dispersion
+        expr = csDEX::exprData(obj, normalized = TRUE)
+        csDEX::rowData(obj)$precision = 1.0 / edgeR::estimateDisp(expr)$tagwise.dispersion
         obj
         })
 
