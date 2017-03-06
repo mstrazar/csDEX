@@ -1,0 +1,324 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+
+
+The notebook reproduces the comparison of prediction accuracy on the simulated datasets, as reported in the csDEX article (Stražar & Curk, 2017),
+Figure 1.x, Supplementary Figure 1.x. For this experiment, csDEX and DEXSeq packages are required. A temporary directory is created in the current working directory.
+
+```{r, message=FALSE, warning=FALSE}
+require(csDEX)
+require(DEXSeq)
+require(ggplot2)
+require(pROC)
+data.dir = file.path(getwd(), "csdex-temp/")
+```
+
+
+A `csDEXdataSet` is generated using the provided `generate` function, which accepts a number of `exons` (features) grouped into `genes`, number of `conditions`, number of `replicates`, number of interacting pairs among features and conditions, and a dataset `type` (`"count"` or `"PSI"`). The `generate` function returns an initialized `csDEXdataSet` object, along with randomly sampled parameters used for comparision.
+
+```{r, message=FALSE}
+obj = generate(exons=20, conditions=3, 
+                   interacting=20, replicates=2, genes=3, 
+                   type="count", data.dir=data.dir)  
+
+cat("Elements of the simulated data:\n\n")
+names(obj)
+```
+
+
+
+The csDEX count model is run following the standard workflow. First, the condition size factors are computed, to account for the differences in sequencing depth. Then, the exon-specific precisions are computed using the quantile-adjusted maximum likelihood method provided by the edgeR package. Finally, the results of differential analysis are computed. 
+
+```{r}
+run.csdex <- function(obj, alpha.wald=NULL, workers=1){
+  cdx = obj$data
+  cdx = csDEX::estimateSizeFactors(cdx)
+  cdx = csDEX::estimatePrecisions(cdx)
+  results = csDEX::testForDEU(cdx, workers=workers, alpha.wald=alpha.wald)
+  row.names(results) = sprintf("%s:%s", results$featureID, results$condition)
+  results
+}
+```
+
+
+The list of differentially expressed exons is obtain by running a previously function. 
+The (feature, condition) pairs are ranked by statistical significance (p-value).
+```{r}
+results = run.csdex(obj)
+head(results)
+```
+
+
+
+
+In order to detect condition-specific interactions, we run DEXSeq once per each pair of conditions. One condition is arbitrarily defined as control (`ctrl`), against which the `case` conditions are compared. To obtain a resulting list similar to csDEX, the `DEXSeqResults` lists are stacked and returned.
+
+```{r}
+run.dexseq <- function(obj){
+  results = data.frame()
+  ctrl = "cond_001"
+  for(case in unique(obj$design$condition)){
+    if (case == ctrl) next;
+    inxs = obj$design$condition == ctrl 
+    inxs = inxs | obj$design$condition == case
+    sampleData = obj$design[inxs,]
+    countfiles = file.path(obj$data.dir, "data", paste0(sampleData$File.accession, ".txt"))
+    
+    dex = DEXSeqDataSetFromHTSeq(
+      countfiles = countfiles,
+      sampleData = sampleData)
+    dex = DEXSeq::estimateSizeFactors(dex)
+    dex = DEXSeq::estimateDispersions(dex)
+    dex = DEXSeq::testForDEU(dex)
+    results.dex = DEXSeqResults(dex)
+    results.dex$condition = case
+    row.names(results.dex) <- sprintf("%s:%s:%s", 
+                                      results.dex$groupID,
+                                      gsub("E", "", results.dex$featureID), 
+                                      case)
+    results = rbind(results, results.dex)
+  }
+  results
+}
+```
+
+
+We define a scoring function, computing the Area under Receiver-operating Characteristic (AUC) curve, quantifying the ability of a model to distinguish the truly interacting exons and conditions, as given by the non-zero values within `interacting` parameters.
+
+```{r}
+score.AUC <- function(obj, results){
+  truth = obj$coefficients$interacting[row.names(results), "interaction"]
+  score.auc = auc(truth != 0, -log(results$pvalue))
+  c(score.auc)
+}
+```
+
+
+
+The experiments is executed for a given number of `repeats`, enabling the computation of means and standard deviations. For comparable scores, the percentage of interacting (exon, condition) pairs is kept at a constant percentage.
+
+```{r, message=FALSE}
+repeats = 5
+exons = 20
+interacting = 0.05 
+replicates = 2
+genes = 3
+
+# Test for different number of conditions
+conditions = c(3, 5, 10, 30, 50)
+
+results = data.frame()
+
+for (r in 1:repeats){
+  for(nc in conditions){
+    obj = generate(exons=exons, conditions=nc, 
+                   interacting=as.integer(exons*genes*interacting), 
+                   replicates=replicates, genes=genes, 
+                   type="count", data.dir=data.dir)  
+    results.dex = run.dexseq(obj)
+    results.cdx = run.csdex(obj, workers = 3)
+    auc.dex = score.AUC(obj, results.dex)
+    auc.cdx = score.AUC(obj, results.cdx)
+    
+    df = data.frame(rep=r, conditions=nc, AUC=auc.cdx, method="csDEX")
+    results = rbind(results, df)    
+    df = data.frame(rep=r, conditions=nc, AUC=auc.dex, method="DEXSeq")
+    results = rbind(results, df) 
+    
+    cat(sprintf("Comparison %d/%d \n", nrow(results), 2 * repeats * length(conditions)))
+  }
+}
+```
+
+The results are plotted using the `ggplot` package. Observe the change in prediction accuracy as the number of conditions increases.
+
+```{r}
+qplot(data=results, x=as.factor(conditions), y=AUC, fill=method, 
+      geom="boxplot", xlab="Num. conditions", main="Count models")
+
+ggsave("prediction_count.pdf", width = 3.38, height = 2.4)
+write.table("prediction_count.tab", results, row.names=FALSE, sep="\t")
+```
+
+
+
+
+Next, we define a pipeline to compare datasets of PSI-based exon usage quantification. The pipeline is similar as above.
+
+```{r}
+run.csdex.PSI <- function(obj, alpha.wald=NULL, workers=1){
+  cdx = obj$data
+  results = csDEX::testForDEU(cdx, workers=workers, alpha.wald=alpha.wald)
+  row.names(results) = sprintf("%s:%s", results$featureID, results$condition)
+  results
+}
+```
+
+
+
+We define a pairwise model, that performs case vs. control comparisons. One condition `cond_001` is arbitrarily selected as control, whereas the rest are compared against it and the final ranked list is produced by stacking the results of individual comparisons. The design file is filtered accordingly and temporarily stored to disk.
+
+```{r}
+run.csdex.PSI.pairwise <- function(obj, workers=1, alpha.wald=NULL){
+  results = data.frame()
+  ctrl = "cond_001"
+  for(case in unique(obj$design$condition)){
+    if (case == ctrl) next;
+    
+    # 
+    inxs = obj$design$condition == ctrl 
+    inxs = inxs | obj$design$condition == case
+    sampleData = obj$design[inxs,]
+    design.file = file.path(data.dir, "tmp.tsv")
+    write.table(sampleData, design.file, sep="\t", row.names=FALSE)
+    
+    cdx = csDEX::csDEXdataSet(data.dir=file.path(obj$data.dir, "data"),
+                              design.file=design.file, type = "PSI")
+    results.pair = csDEX::testForDEU(cdx, workers=workers, alpha.wald=alpha.wald)
+    results.pair = results.pair[results.pair$condition == case,]
+    row.names(results.pair) = sprintf("%s:%s", results.pair$featureID, results.pair$condition)
+    results = rbind(results, results.pair)
+  }
+  results
+}
+```
+
+
+
+The simulation with multiple `repeats` is performed accordingly.
+
+```{r, message=FALSE}
+repeats = 5
+exons = 20
+interacting = 0.05 
+replicates = 2
+genes = 3
+
+# Test for different number of conditions
+conditions = c(3, 5, 10, 30, 50)
+
+results = data.frame()
+
+for (r in 1:repeats){
+  for(nc in conditions){
+    obj = generate(exons=exons, conditions=nc, 
+                   interacting=as.integer(exons*genes*interacting), 
+                   replicates=replicates, genes=genes, 
+                   type="PSI", data.dir=data.dir)  
+    results.psi = run.csdex.PSI(obj, workers = 3)
+    results.pair = run.csdex.PSI.pairwise(obj, workers = 3)
+    auc.psi = score.AUC(obj, results.psi)
+    auc.pair = score.AUC(obj, results.pair)
+    
+    df = data.frame(rep=r, conditions=nc, AUC=auc.psi, method="full")
+    results = rbind(results, df)
+    df = data.frame(rep=r, conditions=nc, AUC=auc.pair, method="pairwise")
+    results = rbind(results, df)    
+     
+    cat(sprintf("Comparison %d/%d \n", nrow(results), 2 * repeats * length(conditions)))
+  }
+}
+```
+```{r}
+qplot(data=results, x=as.factor(conditions), y=AUC, fill=method, 
+      geom="boxplot", xlab="Num. conditions", main="PSI models")
+
+ggsave("prediction_PSI.pdf", width = 3.38, height = 2.4)
+write.table("prediction_PSI.tab", results, row.names=FALSE, sep="\t")
+```
+
+
+
+Compare the effect on low-rank approximation on the model accuracy. The argument `alpha.wald` can be set to probability threshold - a value in `(0,1)` - approximating the full model (thus saving time). Lower values imply less computation, but increase the Type II error (false negative) probability.
+
+```{r, message=FALSE}
+repeats = 5
+exons = 20
+interacting = 0.05 
+replicates = 2
+genes = 3
+conditions = 10
+
+alphas = rev(10^seq(-10, 0, 2))
+
+results = data.frame()
+for (r in 1:repeats){
+  obj = generate(exons=exons, conditions=nc, 
+                   interacting=as.integer(exons*genes*interacting), 
+                   replicates=replicates, genes=genes, 
+                   type="PSI", data.dir=data.dir)  
+  for (a in alphas){
+    results.psi = run.csdex.PSI(obj, workers = 3, alpha.wald = a)
+    auc.psi = score.AUC(obj, results.psi)
+    df = data.frame(rep=r, conditions=nc, AUC=auc.psi, 
+                    alpha=a, n=results.psi$nrow[1], p=max(results.psi$ncol), 
+                    time.mu=mean(results.psi$time), time.sd=sd(results.psi$time))
+    results = rbind(results, df)
+    cat(sprintf("Comparison %d/%d \n", nrow(results), repeats * length(alphas)))
+  }  
+}
+```
+
+
+Repeat similar analysis for the count model.
+
+
+```{r, message=FALSE}
+repeats = 5
+exons = 20
+interacting = 0.05 
+replicates = 2
+genes = 3
+conditions = 10
+
+alphas = rev(10^seq(-1, 0, 1/5))
+
+results = data.frame()
+for (r in 1:repeats){
+  obj = generate(exons=exons, conditions=nc, 
+                   interacting=as.integer(exons*genes*interacting), 
+                   replicates=replicates, genes=genes, 
+                   type="count", data.dir=data.dir)  
+  for (a in alphas){
+    results.psi = run.csdex(obj, workers=3, alpha.wald=a)
+    auc.psi = score.AUC(obj, results.psi)
+    df = data.frame(rep=r, conditions=nc, AUC=auc.psi, 
+                    alpha=a, n=results.psi$nrow[1], p=max(results.psi$ncol), 
+                    time.mu=mean(results.psi$time), time.sd=sd(results.psi$time))
+    results = rbind(results, df)
+    
+    cat(sprintf("Comparison %d/%d \n", nrow(results), repeats * length(alphas)))
+  }  
+}
+```
+
+
+# TODO: unify saving of plots
+Produce diagnostic plots of dependencies between alpha vs. model dimension, AUC, and time.
+```{r}
+
+
+p1 <- qplot(data=results, x=-log10(alpha), y=AUC, group=rep, geom="line", 
+            colour=as.factor(rep), main="PSI model")
+p1 + theme(legend.position="none")
+ggsave("prediction_alphas_PSI_AUC.pdf", width = 3.38, height = 2.4)
+
+p2 <- qplot(data=results, x=-log10(alpha), y=p, group=rep, geom="line", colour=as.factor(rep),
+      ylab="Model parameters")
+p2 + theme(legend.position="none")
+ggsave("prediction_alphas_PSI_pars.pdf", width = 3.38, height = 2.4)
+
+
+p3 <- qplot(data=results, x=-log10(alpha), y=time.mu, group=rep, geom="line", colour=as.factor(rep),
+      ylab="Mean time / test (sec.)")
+p3 + theme(legend.position="none")
+ggsave("prediction_alphas_PSI_time.pdf", width = 3.38, height = 2.4)
+
+write.table(results, "prediction_alphas_PSI.tab",  row.names=FALSE, sep="\t")
+```
+
+
+
