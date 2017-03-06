@@ -80,7 +80,7 @@ for (r in 1:repeats){
 Compute means and stadard deviations. Finally, compare the fits on a plot and compute root mean square errors. Observe the error decreasing with a larger number of experimental conditions.
   
 ```{r}
-  x = 1:features
+  x = 1:exons
   mean.cdx = colMeans(est.cdx)
   std.cdx = apply(est.cdx, 2, sd)
   down.cdx = mean.cdx + std.cdx
