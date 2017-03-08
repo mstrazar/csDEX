@@ -87,6 +87,7 @@ Compute means and stadard deviations. Finally, compare the fits on a plot and co
   up.cdx = mean.cdx - std.cdx
   rmse.cdx = sqrt(sum((mean.cdx - dispersions)^2))
   
+  est.dex[est.dex > 3] = NA
   mean.dex = colMeans(est.dex, na.rm=TRUE)
   std.dex = apply(est.dex, 2, sd, na.rm=TRUE)
   down.dex = mean.dex + std.dex

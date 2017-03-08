@@ -140,7 +140,7 @@ qplot(data=results, x=as.factor(conditions), y=AUC, fill=method,
       geom="boxplot", xlab="Num. conditions", main="Count models")
 
 ggsave("prediction_count.pdf", width = 3.38, height = 2.4)
-write.table("prediction_count.tab", results, row.names=FALSE, sep="\t")
+write.table(results, "prediction_count.tab", row.names=FALSE, sep="\t")
 ```
 
 
@@ -227,7 +227,7 @@ qplot(data=results, x=as.factor(conditions), y=AUC, fill=method,
       geom="boxplot", xlab="Num. conditions", main="PSI models")
 
 ggsave("prediction_PSI.pdf", width = 3.38, height = 2.4)
-write.table("prediction_PSI.tab", results, row.names=FALSE, sep="\t")
+write.table(results, "prediction_PSI.tab", row.names=FALSE, sep="\t")
 ```
 
 
