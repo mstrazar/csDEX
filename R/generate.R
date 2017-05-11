@@ -39,9 +39,10 @@ generate <- function(exons=16, conditions=20, interacting=2, replicates=2, genes
   stopifnot(conditions >= 2)
   set.seed(seed)
   
-  # Latent parameters - count
+  # Latent parameters
   beta_ex      = runif(exons*genes, -1, 2)
   beta_con     = runif(conditions,  -1, 2)
+  
   if(is.null(dispersions)) 
     dispersions  = rgamma(exons*genes, 1, 2)
   precisions   = 1.0 / dispersions
@@ -56,7 +57,7 @@ generate <- function(exons=16, conditions=20, interacting=2, replicates=2, genes
   variances = matrix(0, exons*genes, conditions) # Variance is a transformed parameter
   
   # Randomly input interacting pairs ; strong interaction effect
-  ix = sample(2:conditions, interacting, replace=TRUE)
+  ix = sample(2:(exons*genes), interacting, replace=TRUE)
   iy = sample(2:conditions, interacting, replace=TRUE)
   for (k in 1:interacting)
     I[ix[k], iy[k]] = sample(c(runif(1, -8, -6), runif(1, 1, 2)), 1)
@@ -84,6 +85,7 @@ generate <- function(exons=16, conditions=20, interacting=2, replicates=2, genes
   
   # Create metadata and store to disk
   cdx = NULL
+  ints = melt(I)
   if(!is.null(data.dir)){
     count.dir = file.path(data.dir, "data")
     pars.dir = file.path(data.dir, "parameters")
@@ -118,7 +120,6 @@ generate <- function(exons=16, conditions=20, interacting=2, replicates=2, genes
     message("Storing parameters")
     row.names(I) = exons_genes
     colnames(I) = condition.ids
-    ints = melt(I)
     ints = ints[order(ints$value),]
     colnames(ints) = c("featureID", "condition", "interaction")
     row.names(ints) = sprintf("%s:%s", ints$featureID, ints$condition)
