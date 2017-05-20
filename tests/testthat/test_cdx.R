@@ -59,3 +59,21 @@ test_that("test csDEX dataset - PSI (standard workflow)", {
   result = testForDEU(cdx, workers=2, tmp.dir=NULL)
 })
 
+### Additional fields
+test_that("test csDEX dataset - PSI (additional column)", {
+  cdx = csDEXdataSet(data.dir=data.dir.psi, design.file=design.file, type="PSI",
+                     col.condition="Experiment.accession",
+                     col.additional=c("Experiment.target", "Controlled.by"))
+  expect_s4_class(cdx, "csDEXdataSet")
+  result = testForDEU(cdx, workers=1, tmp.dir=NULL, 
+                      formula = y ~ featureID + Experiment.target + Controlled.by)
+})
+
+### Additional fields - invalid
+test_that("test csDEX dataset - PSI (wrong additional column)", {
+  expect_error(
+    csDEXdataSet(data.dir=data.dir.psi, design.file=design.file, type="PSI",
+                     col.condition="Experiment.target",
+                     col.additional=c("Derived.from"))
+  )
+})

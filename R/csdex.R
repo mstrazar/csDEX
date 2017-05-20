@@ -109,7 +109,8 @@ csDEXdataSet <- function(data.dir, design.file, type="count",
         col.condition="Experiment.target",
         col.replicate="File.accession",
         col.testable="testable",
-        input.read.count="input.read.count",
+        col.read.count="input.read.count",
+        col.additional=c(),
         data.file.ext="txt",
         aggregation=NULL,
         min.bin.count=NULL,
@@ -119,7 +120,7 @@ csDEXdataSet <- function(data.dir, design.file, type="count",
     ### Input checks ###
     if(!(type %in% c("count", "PSI")))
       stop("type must be one of ('count', 'PSI')")
-    
+
     ### Set recommended parameters
     if(is.null(min.bin.count)) min.bin.count = 0
     if(type == "PSI"){
@@ -150,6 +151,19 @@ csDEXdataSet <- function(data.dir, design.file, type="count",
     design = read.csv(design.file, sep="\t", header=TRUE)
     stopifnot(col.condition %in% colnames(design))
     stopifnot(col.replicate %in% colnames(design))
+    
+    # Input check if additional columns have been requested
+    # Assert values of additional columns can be uniquely mapped to conditions
+    if(length(col.additional) > 0){
+      for(col.name in col.additional){
+        cond2add = aggregate(design[,col.name], 
+                             by=list(condition=design[,col.condition]),
+                             FUN=function(x) length(unique(x)) == 1)
+        if(!all(cond2add$x)) 
+          stop(sprintf("Values of field %s are not unique for one or more conditions", 
+                        col.name))
+      }
+    }
 
     # Parse condition but retain order of rowss
     conditions = sort(unique(design[,col.condition]))
@@ -171,8 +185,8 @@ csDEXdataSet <- function(data.dir, design.file, type="count",
         # Merge data on read counts if available
         # Aggregated in the same manner than counts
         cond.lib.size = NULL
-        if (input.read.count %in% colnames(design)){
-            cond.lib.size = aggregation(design[design[,col.condition] == cond, input.read.count])
+        if (col.read.count %in% colnames(design)){
+            cond.lib.size = aggregation(design[design[,col.condition] == cond, col.read.count])
             lib.sizes = c(lib.sizes, cond.lib.size)
         }
         
@@ -235,8 +249,15 @@ csDEXdataSet <- function(data.dir, design.file, type="count",
     colData = data.frame(condition=colnames(exprData))
     row.names(colData) <- colData$condition
     if(!is.null(lib.sizes)) colData$lib.size = lib.sizes
+    
+    # Append additional columns
     colData$testable = testable
-
+    for (col.name in col.additional){
+      for (cond in colData$condition){
+        val = unique(design[design[,col.condition] == cond, col.name])
+        colData[cond, col.name] = val
+      }
+    }
     new("csDEXdataSet", exprData=exprData, rowData=rowData, colData=colData, dataType=type)
 }
 
@@ -275,7 +296,8 @@ waldTest <- function(mm0, model0, alpha=0.05){
 }
 
 
-geneModel <- function(input, min.cpm=NULL, tmp.dir=NULL, dist="count", alpha.wald=NULL){
+geneModel <- function(input, min.cpm=NULL, tmp.dir=NULL, dist="count", 
+                      alpha.wald=NULL, formula=featureID + condition){
   
     # Writing to file
     write.gene.file <- function(tmp.dir, results, gene){
@@ -294,9 +316,10 @@ geneModel <- function(input, min.cpm=NULL, tmp.dir=NULL, dist="count", alpha.wal
     results = reshape::melt(expr)
     colnames(results) = c("featureID", "condition", "y")
     results = merge(results, rowdata, by="featureID")
-    results$featureID = as.factor(results$featureID)
-    results$testable = coldata[results$condition, "testable"]
-    results[, c("cpm", "pvalue", "fdr", "fdr.all", "padj", "residual", "loglik", "ddev", "time", "nrow", "ncol", "msg")] = NA
+    results[,colnames(coldata)] = coldata[as.character(results$condition), colnames(coldata)]
+    results$featureID = droplevels(as.factor(results$featureID))
+    results$condition = droplevels(as.factor(results$condition))
+    results[,c("cpm", "pvalue", "fdr", "fdr.all", "padj", "residual", "loglik", "ddev", "time", "nrow", "ncol", "msg")] = NA
 
     # Check variance
     if(var(results$y) == 0){
@@ -321,7 +344,7 @@ geneModel <- function(input, min.cpm=NULL, tmp.dir=NULL, dist="count", alpha.wal
         results$y = round(results$y)
 
     # Null hypothesis
-    frm0 = y ~ featureID + condition
+    frm0 = formula
     mm0  = model.matrix(frm0, results)
 
     # Fit null model and store coefficients for better initialization
@@ -338,7 +361,7 @@ geneModel <- function(input, min.cpm=NULL, tmp.dir=NULL, dist="count", alpha.wal
                 warning = function(w) w,
                 error = function(e) e)        
     }
-    if(class(model0) != "list") {
+    if(class(model0)[1] != "list") {
       results$msg[is.na(results$msg)] = sprintf("null model fit error: %s", 
                                                 gsub("[\r\n\t]", "", model0))
       results$testable = FALSE
@@ -355,7 +378,7 @@ geneModel <- function(input, min.cpm=NULL, tmp.dir=NULL, dist="count", alpha.wal
     results$interaction = 0
     if(is.null(alpha.wald)){
       # Full alternative model for gene
-      frm1 = y ~ featureID + condition + interaction
+      frm1 = as.formula(paste0(deparse(formula), "+interaction"))
       mm1 = model.matrix(frm1, results)
     } else {
       # Zero coefficients merged into one column
@@ -395,7 +418,7 @@ geneModel <- function(input, min.cpm=NULL, tmp.dir=NULL, dist="count", alpha.wal
                 warning = function(w) w,
                 error = function(e) e)
         }
-        if(class(model1) != "list") {
+        if(class(model1)[1] != "list") {
           results$msg[i] = sprintf("fit error: %s", 
                                    gsub("[\r\n\t]", "", model1))
           results$testable[i] = FALSE
@@ -428,7 +451,8 @@ geneModel <- function(input, min.cpm=NULL, tmp.dir=NULL, dist="count", alpha.wal
 }
 
 
-testForDEU <- function(cdx, workers=1, tmp.dir=NULL, min.cpm=NULL, alpha.wald=NULL){
+testForDEU <- function(cdx, workers=1, tmp.dir=NULL, min.cpm=NULL, alpha.wald=NULL,
+                       formula=y~featureID+condition){
     # Test for differential exon usage given a csDEX data object file,
     # with calculated precisions and size factors. Only test genes
     #   if they have any reads mapped onto them
@@ -461,12 +485,14 @@ testForDEU <- function(cdx, workers=1, tmp.dir=NULL, min.cpm=NULL, alpha.wald=NU
     # If workers == 1, run within the same process
     if(workers > 1){
       message(sprintf("Dispatching on %d workers, cache directory %s. \n", workers, tmp.dir))
-      jobs = mclapply(inputs, csDEX::geneModel, min.cpm, tmp.dir, dist, alpha.wald,
-          mc.preschedule=FALSE, mc.cores=workers, mc.silent=TRUE)
+      jobs = mclapply(inputs, csDEX::geneModel, 
+                      min.cpm, tmp.dir, dist, alpha.wald, formula,
+                      mc.preschedule=FALSE, mc.cores=workers, mc.silent=TRUE)
     } else {
       jobs = list()
       for(inp in inputs) 
-        jobs[[length(jobs)+1]] = csDEX::geneModel(inp, min.cpm, tmp.dir, dist, alpha.wald)
+        jobs[[length(jobs)+1]] = csDEX::geneModel(inp, min.cpm, tmp.dir, 
+                                          dist, alpha.wald, formula)
     }
 
     results = data.frame()
