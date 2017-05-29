@@ -495,13 +495,16 @@ testForDEU <- function(cdx, workers=1, tmp.dir=NULL, min.cpm=NULL, alpha.wald=NU
                                           dist, alpha.wald, formula)
     }
 
-    results = data.frame()
-    for (i in 1:length(jobs)){
-        if (!class(jobs[[i]]) == "try-error")
-            results = rbind(results, jobs[[i]])
+    if(is.null(tmp.dir)){
+      results = data.frame()
+      for (i in 1:length(jobs)){
+          if (!class(jobs[[i]]) == "try-error")
+              results = rbind(results, jobs[[i]])
+      }
+      results$fdr.all = p.adjust(results$pvalue, "BH")
+      results=results[order(results$pvalue),]
+      return(results)
+    } else {
+      message(sprintf("Results for written to %s", tmp.dir))
     }
-    
-    results$fdr.all = p.adjust(results$pvalue, "BH")
-    results=results[order(results$pvalue),]
-    return(results)
 }
