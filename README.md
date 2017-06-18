@@ -16,6 +16,12 @@ Capabilities:
 * parallel processing of multiple genes (groups),
 * time-efficient model approximation with no change in false positive rate.
 
+## Vignettes
+* The vignete on general usage of csDEX - this page [Rmd](vignettes/csdex_vignette.Rmd).
+* Comparison of csDEX and DEXSeq models on generated data [Rmd](vignettes/prediction.Rmd)[html](vignettes/prediction.nb.html).
+* Comparison of different dispersion estimation methods [Rmd](vignettes/dispersion.Rmd)[html](vignettes/dispersion.nb.html).
+
+
 ## Installation
 
 Install the latest version hosted on GitHub:

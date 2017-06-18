@@ -10,7 +10,7 @@ Initialize and instance of the csDEXdataSet object, by constructing a
 feature-by-condition data matrix with associated metadata.
 }
 \usage{
-csDEXdataSet(data.dir, design.file, type = "count", col.condition = "Experiment.target", col.replicate = "File.accession", data.file.ext = "txt", aggregation = NULL, min.bin.count = NULL, min.gene.count = NULL, zero.out = NULL)
+csDEXdataSet(data.dir, design.file, type = "count", col.condition = "Experiment.target", col.replicate = "File.accession", col.testable = "testable", col.read.count = "input.read.count", col.additional = c(), data.file.ext = "txt", aggregation = NULL, min.bin.count = NULL, min.gene.count = NULL, zero.out= NULL))
 }
 %- maybe also 'usage' for other objects documented here.
 \arguments{
@@ -37,6 +37,15 @@ csDEX.
     Name of the column in the design file denoting unique file identifiers
 (without extension).
 }
+  \item{col.read.count}{
+  Column denotig original input read counts.  
+}
+  \item{col.additional}{
+    Additional columns to import (for use in e.g. complex model designs).
+}
+  \item{col.testable}{
+    Optional column with binary (TRUE/FALSE) information for which conditions to test.
+  }
   \item{data.file.ext}{
     Replicate files extension (default: "txt").
 }

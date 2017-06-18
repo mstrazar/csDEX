@@ -297,7 +297,7 @@ waldTest <- function(mm0, model0, alpha=0.05){
 
 
 geneModel <- function(input, min.cpm=NULL, tmp.dir=NULL, dist="count", 
-                      alpha.wald=NULL, formula=featureID + condition){
+                      alpha.wald=NULL, formula=y~featureID+condition){
   
     # Writing to file
     write.gene.file <- function(tmp.dir, results, gene){

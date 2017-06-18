@@ -13,8 +13,10 @@ The function geneModel invoke by testForDEU and possibly dispatched to multiple 
 The waldTest is invoked by geneModel if model approximation is used.
 }
 \usage{
-testForDEU(cdx, workers = 1, tmp.dir = NULL, min.cpm = NULL, alpha.wald = NULL)
-geneModel(input, min.cpm = NULL, tmp.dir = NULL, dist="count", alpha.wald = NULL)
+testForDEU(cdx, workers = 1, tmp.dir = NULL, min.cpm = NULL, 
+  alpha.wald = NULL, formula = y ~ featureID + condition)
+geneModel(input, min.cpm = NULL, tmp.dir = NULL, dist="count", 
+  alpha.wald = NULL, formula = y ~ featureID + condition)
 waldTest(mm0, model0, alpha=0.05)
 }
 %- maybe also 'usage' for other objects documented here.
@@ -36,6 +38,8 @@ waldTest(mm0, model0, alpha=0.05)
   any parameters non-significantly different from zero in the null model are merged to a single "error" parameter.
   Can significantly reduce computation time for large and sparse datasets.
 }
+\item{formula} 
+  Formula object describing the null model. For the alternative model, an interaction term for the current `(featureID, condition)` pair is appended.
 }
 \details{
 The core function of the package. Evaluate significance of all possible pairs of interactions between features and conditions by means of difference in deviance model selection. Generalized linear models (GLMs) based on the Negative Binomial distribution are assumed for the quantification based on read counts. The Beta distribution GLM is used to model data based on  percentage-spliced (PSI) quantification.  

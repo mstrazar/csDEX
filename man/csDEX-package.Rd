@@ -21,26 +21,28 @@ changes in usage of splice sites that are specific to an
 experimental condition. 
 
 Capabilities:
+\itemize{
   \item{handling of sequence data in form of read counts or percentages (e.g. percent-spliced in, PSI),}
   \item{modelling all types of splicing events,}
   \item{discovery and ranking of condition-specific changes,}
   \item{parallel processing of multiple genes (groups),}
   \item{time-efficient model approximation with no change in false positive rate.}
+ }
 }
 \author{
 \packageAuthor{csDEX}
 
 Maintainer: \packageMaintainer{csDEX}
 }
-\references{
-~~ Literature or other references for background information ~~
-}
-~~ Optionally other standard keywords, one per line, from file KEYWORDS in the R documentation directory ~~
+% \references{
+% ~~ Literature or other references for background information ~~
+% }
+%~~ Optionally other standard keywords, one per line, from file KEYWORDS in the R documentation directory ~~
 \keyword{ package }
-\seealso{
-~~ Optional links to other man pages, e.g. ~~
-~~ \code{\link[<pkg>:<pkg>-package]{<pkg>}} ~~
-}
-\examples{
-# ~~ simple examples of the most important functions ~~
-}
+%\seealso{
+%~~ Optional links to other man pages, e.g. ~~
+%~~ \code{\link[<pkg>:<pkg>-package]{<pkg>}} ~~
+%}
+%\examples{
+% ~~ simple examples of the most important functions ~~
+%}
