@@ -1,7 +1,5 @@
 context("Test csDEXdataSet generate")
 
-# TODO: solve problem in this correlated 
-# variance computation
 tmp.dir = "./temp"
 dir.create(tmp.dir, recursive=TRUE)
 for (typ in c("count", "PSI")){
