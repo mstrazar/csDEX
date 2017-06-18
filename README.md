@@ -17,9 +17,10 @@ Capabilities:
 * time-efficient model approximation with no change in false positive rate.
 
 ## Vignettes
-* The vignete on general usage of csDEX - this page [Rmd](vignettes/csdex_vignette.Rmd).
-* Comparison of csDEX and DEXSeq models on generated data [Rmd](vignettes/prediction.Rmd)[html](vignettes/prediction.nb.html).
-* Comparison of different dispersion estimation methods [Rmd](vignettes/dispersion.Rmd)[html](vignettes/dispersion.nb.html).
+* The vignete on general usage of csDEX - this page 
+[(Rmd)](vignettes/csdex_vignette.Rmd).
+* Comparison of csDEX and DEXSeq models on generated data [(Rmd)](vignettes/prediction.Rmd)[(html)](http://htmlpreview.github.com/?https://github.com/mstrazar/csDEX/blob/master/vignettes/prediction.nb.html).
+* Comparison of different dispersion estimation methods [(Rmd)](vignettes/dispersion.Rmd)[(html)](http://htmlpreview.github.com/?https://github.com/mstrazar/csDEX/blob/master/vignettes/dispersion.nb.html).
 
 
 ## Installation
