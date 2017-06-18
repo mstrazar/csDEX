@@ -1,5 +1,5 @@
 ---
-title: "R Notebook"
+title: "Comparison of dispersion estimation methods"
 output:
   html_document: default
   html_notebook: default
@@ -7,7 +7,7 @@ output:
  
 
 The notebook reproduces the comparison of dispersion fitting in the csDEX article (Stražar & Curk, 2017),
-Figure 1.x, Supplementary Figure 1.x. For this experiment, csDEX and DEXSeq packages are required. A temporary directory is created in the current working directory.
+ Supplementary Figure 4. For this experiment, csDEX and DEXSeq packages are required. A temporary directory is created in the current working directory.
 
 ```{r, message=FALSE, warning=FALSE}
 require(csDEX)

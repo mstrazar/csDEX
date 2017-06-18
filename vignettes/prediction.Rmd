@@ -1,12 +1,12 @@
 ---
-title: "R Notebook"
+title: "Predictive accuracy of csDEX"
 output: html_notebook
 ---
 
 
 
 The notebook reproduces the comparison of prediction accuracy on the simulated datasets, as reported in the csDEX article (Stražar & Curk, 2017),
-Figure 1.x, Supplementary Figure 1.x. For this experiment, csDEX and DEXSeq packages are required. A temporary directory is created in the current working directory.
+Figure 1 and Supplementary Figure 3. For this experiment, csDEX and DEXSeq packages are required. A temporary directory is created in the current working directory.
 
 ```{r, message=FALSE, warning=FALSE}
 require(csDEX)
@@ -24,11 +24,10 @@ A `csDEXdataSet` is generated using the provided `generate` function, which acce
 obj = generate(exons=20, conditions=3, 
                    interacting=20, replicates=2, genes=3, 
                    type="count", data.dir=data.dir)  
-
-cat("Elements of the simulated data:\n\n")
-names(obj)
 ```
 
+
+## The count models
 
 
 The csDEX count model is run following the standard workflow. First, the condition size factors are computed, to account for the differences in sequencing depth. Then, the exon-specific precisions are computed using the quantile-adjusted maximum likelihood method provided by the edgeR package. Finally, the results of differential analysis are computed. 
@@ -92,7 +91,10 @@ We define a scoring function, computing the Area under Receiver-operating Charac
 ```{r}
 score.AUC <- function(obj, results){
   truth = obj$coefficients$interacting[row.names(results), "interaction"]
-  score.auc = auc(truth != 0, -log(results$pvalue))
+  pred = results$pvalue
+  pred[is.na(pred)] = 1
+  if(all(truth == 0)){return(0.5)}
+  score.auc = auc(truth != 0, -log(pred))
   c(score.auc)
 }
 ```
@@ -102,14 +104,14 @@ score.AUC <- function(obj, results){
 The experiments is executed for a given number of `repeats`, enabling the computation of means and standard deviations. For comparable scores, the percentage of interacting (exon, condition) pairs is kept at a constant percentage.
 
 ```{r, message=FALSE}
-repeats = 30
+repeats = 15
 exons = 20
 interacting = 0.05 
 replicates = 2
 genes = 3
 
 # Test for different number of conditions
-conditions = c(3, 5, 10, 30, 50)
+conditions = c(3, 5, 10)
 
 results = data.frame()
 
@@ -120,7 +122,7 @@ for (r in 1:repeats){
                    replicates=replicates, genes=genes, 
                    type="count", data.dir=data.dir)  
     results.dex = run.dexseq(obj)
-    results.cdx = run.csdex(obj, workers = 3)
+    results.cdx = run.csdex(obj, workers = 1)  # Increase number of workers
     auc.dex = score.AUC(obj, results.dex)
     auc.cdx = score.AUC(obj, results.cdx)
     
@@ -139,16 +141,12 @@ The results are plotted using the `ggplot` package. Observe the change in predic
 ```{r}
 qplot(data=results, x=as.factor(conditions), y=AUC, fill=method, 
       geom="boxplot", xlab="Num. conditions", main="Count models") + scale_fill_grey(start=0.4, end=0.9) + theme_bw() + theme(legend.position = "top")
-
-ggsave("prediction_count.pdf", width = 3.38, height = 3.38) 
-write.table(results, "prediction_count.tab", row.names=FALSE, sep="\t")
 ```
 
 
-Run a statistical analysis of ranking within the results.
+Run a statistical analysis of methods ranking, using the Wald test and Student T-test.
 
 ```{r}
-results = read.table("prediction_count.tab", header = TRUE)
 test_frame = data.frame()
 for (nc in c(unique(results$conditions), "all")){
   if(nc == "all"){
@@ -165,46 +163,12 @@ for (nc in c(unique(results$conditions), "all")){
   test_frame = rbind(test_frame, df)
 }
 
-sink("prediction_stats_count.tex")
-print(xtable(test_frame, digits=c(0, 0, 3, 3, -1, -1), display=c("d", "d", "f", "f", "e", "e")), 
-      include.rownames=FALSE)
-sink()
-```
-
-```{r}
-results = read.table("prediction_PSI.tab", header = TRUE)
-test_frame = data.frame()
-for (nc in c(unique(results$conditions), "all")){
-  if(nc == "all"){
-    x = results[results$method == "full", "AUC"]
-    y = results[results$method == "pairwise", "AUC"] 
-  } else {
-    x = results[results$conditions == nc & results$method == "full", "AUC"]
-    y = results[results$conditions == nc & results$method == "pairwise", "AUC"]  
-  }
-  wilc = wilcox.test(x, y, paired = TRUE, alternative = "greater")
-  tt = t.test(x, y, alternative = "greater")
-  df = data.frame(p=nc, mean.full=mean(x), mean.pairwise=mean(y),
-                  wilcox.p=wilc$p.value, ttest.p=tt$p.value)
-  test_frame = rbind(test_frame, df)
-}
-
-sink("prediction_stats_PSI.tex")
-print(xtable(test_frame, digits=c(0, 0, 2, 2, -1, -1), display=c("d", "d", "f", "f", "e", "e")), 
-      include.rownames=FALSE)
-sink()
+print(test_frame)
 ```
 
 
 
-
-
-
-
-
-
-
-
+## The Percent-spliced in (PSI) models
 
 Next, we define a pipeline to compare datasets of PSI-based exon usage quantification. The pipeline is similar as above.
 
@@ -251,16 +215,16 @@ run.csdex.PSI.pairwise <- function(obj, workers=1, alpha.wald=NULL){
 The simulation with multiple `repeats` is performed accordingly.
 
 ```{r, message=FALSE}
-repeats = 30
+repeats = 15
 exons = 20
 interacting = 0.05 
 replicates = 2
 genes = 3
 
 # Test for different number of conditions
-conditions = c(3, 5, 10, 30, 50)
+conditions = c(3, 5, 10)
 
-results = data.frame()
+results.2 = data.frame() # TODO:Rename 
 
 for (r in 1:repeats){
   for(nc in conditions){
@@ -274,24 +238,44 @@ for (r in 1:repeats){
     auc.pair = score.AUC(obj, results.pair)
     
     df = data.frame(rep=r, conditions=nc, AUC=auc.psi, method="full")
-    results = rbind(results, df)
+    results.2 = rbind(results.2, df)
     df = data.frame(rep=r, conditions=nc, AUC=auc.pair, method="pairwise")
-    results = rbind(results, df)    
+    results.2 = rbind(results.2, df)    
      
-    cat(sprintf("Comparison %d/%d \n", nrow(results), 2 * repeats * length(conditions)))
+    cat(sprintf("Comparison %d/%d \n", nrow(results.2), 2 * repeats * length(conditions)))
   }
 }
 ```
 
 ```{r}
-qplot(data=results, x=as.factor(conditions), y=AUC, fill=method, 
+qplot(data=results.2, x=as.factor(conditions), y=AUC, fill=method, 
       geom="boxplot", xlab="Num. conditions", main="PSI models") + scale_fill_grey(start=0.4, end=0.9) + theme_bw() + theme(legend.position = "top")
-
-ggsave("prediction_PSI.pdf", width = 3.38, height = 3.38)
-write.table(results, "prediction_PSI.tab", row.names=FALSE, sep="\t")
 ```
 
 
+Run a statistical analysis of methods ranking, using the Wald test and Student T-test.
+
+```{r}
+test_frame = data.frame()
+for (nc in c(unique(results$conditions), "all")){
+  if(nc == "all"){
+    x = results.2[results.2$method == "full", "AUC"]
+    y = results.2[results.2$method == "pairwise", "AUC"] 
+  } else {
+    x = results.2[results.2$conditions == nc & results.2$method == "full", "AUC"]
+    y = results.2[results.2$conditions == nc & results.2$method == "pairwise", "AUC"]  
+  }
+  wilc = wilcox.test(x, y, paired = TRUE, alternative = "greater")
+  tt = t.test(x, y, alternative = "greater")
+  df = data.frame(p=nc, mean.full=mean(x), mean.pairwise=mean(y),
+                  wilcox.p=wilc$p.value, ttest.p=tt$p.value)
+  test_frame = rbind(test_frame, df)
+}
+print(test_frame)
+```
+
+
+## Effects of low-rank approximation
 
 Compare the effect on low-rank approximation on the model accuracy. The argument `alpha.wald` can be set to probability threshold - a value in `(0,1)` - approximating the full model (thus saving time). Lower values imply less computation, but increase the Type II error (false negative) probability.
 
@@ -305,9 +289,9 @@ conditions = 10
 
 alphas = rev(10^seq(-10, 0, 2))
 
-results = data.frame()
+results.app = data.frame()
 for (r in 1:repeats){
-  obj = generate(exons=exons, conditions=nc, 
+  obj = generate(exons=exons, conditions=conditions, 
                    interacting=as.integer(exons*genes*interacting), 
                    replicates=replicates, genes=genes, 
                    type="PSI", data.dir=data.dir)  
@@ -317,15 +301,35 @@ for (r in 1:repeats){
     df = data.frame(rep=r, conditions=nc, AUC=auc.psi, 
                     alpha=a, n=results.psi$nrow[1], p=max(results.psi$ncol), 
                     time.mu=mean(results.psi$time), time.sd=sd(results.psi$time))
-    results = rbind(results, df)
-    cat(sprintf("Comparison %d/%d \n", nrow(results), repeats * length(alphas)))
+    results.app = rbind(results.app, df)
+    cat(sprintf("Comparison %d/%d \n", nrow(results.app), repeats * length(alphas)))
   }  
 }
 ```
 
 
-Repeat similar analysis for the count model.
+Produce diagnostic plots of dependencies between alpha vs. model dimension, AUC, and time.
+```{r}
+p1 <- qplot(data=results.app, x=-log10(alpha), y=AUC, group=rep, geom="line", 
+            colour=as.factor(rep), main="PSI model")
+p1 + theme(legend.position="none")
+```
 
+```{r}
+p2 <- qplot(data=results.app, x=-log10(alpha), y=p, group=rep, geom="line", colour=as.factor(rep),
+      ylab="Model parameters")
+p2 + theme(legend.position="none")
+```
+
+```{r}
+p3 <- qplot(data=results.app, x=-log10(alpha), y=time.mu, group=rep, geom="line", colour=as.factor(rep),
+      ylab="Mean time / test (sec.)")
+p3 + theme(legend.position="none")
+```
+
+
+
+Repeat similar analysis for the count model. The plots above can be refreshed accordingly.
 
 ```{r, message=FALSE}
 repeats = 5
@@ -337,9 +341,9 @@ conditions = 10
 
 alphas = rev(10^seq(-1, 0, 1/5))
 
-results = data.frame()
+results.app = data.frame()
 for (r in 1:repeats){
-  obj = generate(exons=exons, conditions=nc, 
+  obj = generate(exons=exons, conditions=conditions, 
                    interacting=as.integer(exons*genes*interacting), 
                    replicates=replicates, genes=genes, 
                    type="count", data.dir=data.dir)  
@@ -349,37 +353,9 @@ for (r in 1:repeats){
     df = data.frame(rep=r, conditions=nc, AUC=auc.psi, 
                     alpha=a, n=results.psi$nrow[1], p=max(results.psi$ncol), 
                     time.mu=mean(results.psi$time), time.sd=sd(results.psi$time))
-    results = rbind(results, df)
+    results.app = rbind(results.app, df)
     
-    cat(sprintf("Comparison %d/%d \n", nrow(results), repeats * length(alphas)))
+    cat(sprintf("Comparison %d/%d \n", nrow(results.app), repeats * length(alphas)))
   }  
 }
 ```
-
-
-# TODO: unify saving of plots
-Produce diagnostic plots of dependencies between alpha vs. model dimension, AUC, and time.
-```{r}
-
-
-p1 <- qplot(data=results, x=-log10(alpha), y=AUC, group=rep, geom="line", 
-            colour=as.factor(rep), main="PSI model")
-p1 + theme(legend.position="none")
-ggsave("prediction_alphas_PSI_AUC.pdf", width = 3.38, height = 2.4)
-
-p2 <- qplot(data=results, x=-log10(alpha), y=p, group=rep, geom="line", colour=as.factor(rep),
-      ylab="Model parameters")
-p2 + theme(legend.position="none")
-ggsave("prediction_alphas_PSI_pars.pdf", width = 3.38, height = 2.4)
-
-
-p3 <- qplot(data=results, x=-log10(alpha), y=time.mu, group=rep, geom="line", colour=as.factor(rep),
-      ylab="Mean time / test (sec.)")
-p3 + theme(legend.position="none")
-ggsave("prediction_alphas_PSI_time.pdf", width = 3.38, height = 2.4)
-
-write.table(results, "prediction_alphas_PSI.tab",  row.names=FALSE, sep="\t")
-```
-
-
-
