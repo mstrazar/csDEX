@@ -1,6 +1,8 @@
 ---
 title: "R Notebook"
-output: html_notebook
+output:
+  html_document: default
+  html_notebook: default
 ---
  
 
@@ -30,7 +32,6 @@ dispersion.csdex <- function(obj, nreps=1){
 ```
 
 
-
 Estimating dispersion with DEXSeq (Anders et. al, 2012) is also straightforward. The count files are loaded from disk and a standard workflow is used to first estimate the size factors (differences in sample means due to sequencing depth) and the using the Cox-Reid dispersion estimate. 
 
 ```{r}
@@ -50,11 +51,10 @@ dispersion.dexseq <- function(obj){
 ```
 
 
-
 Generate a dataset with a fixed vector of `dispersions`. The values are the same for each of the `repeats`, enabling to compute mean predictions and standard deviations. The DEXSeq dispersion fitting can fail in the case of a large number of zero counts. 
 
 ```{r, message=FALSE, warning=FALSE}
-conditions = 3
+conditions = 10
 exons = 20
 repeats = 30
 replicates = 3
@@ -81,12 +81,6 @@ for (r in 1:repeats){
 Compute means and stadard deviations. Finally, compare the fits on a plot and compute root mean square errors. Observe the error decreasing with a larger number of experimental conditions.
   
 ```{r}
-  # Store data matrices
-  fname = sprintf("/Users/martin/Desktop/dispersions/dispersions_ncon-%d_cdx.tab", conditions)
-  write.table(est.cdx, fname, row.names = FALSE, col.names = FALSE)
-  fname = sprintf("/Users/martin/Desktop/dispersions/dispersions_ncon-%d_dex.tab", conditions)
-  write.table(est.dex, fname, row.names = FALSE, col.names = FALSE)
-
   x = 1:(exons*genes)
   mean.cdx = colMeans(est.cdx)
   std.cdx = apply(est.cdx, 2, sd)
@@ -101,7 +95,6 @@ Compute means and stadard deviations. Finally, compare the fits on a plot and co
   up.dex = mean.dex - std.dex
   rmse.dex = sqrt(sum((mean.dex - dispersions)^2))
   
-  pdf(sprintf("/Users/martin/Desktop/dispersions/dispersions_ncon-%d.pdf", conditions), width=3.38, height=3.38)
   plot(dispersions, type="l", col="black", xlab="Exon", ylab="Dispersion",
        main = sprintf("Conditions: %d", conditions))
   op = par(cex = 0.8)
@@ -112,8 +105,4 @@ Compute means and stadard deviations. Finally, compare the fits on a plot and co
   legend("topright", inset=.01, 
          c(sprintf("qCML (%.2f)", rmse.cdx), sprintf("Cox-Reid (%.2f)", rmse.dex)),   
          fill=c("orange", "blue"), bty="n")
-  dev.off()
-  
-  
 ```
-
