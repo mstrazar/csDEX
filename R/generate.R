@@ -50,6 +50,7 @@ generate <- function(exons=16, conditions=20, interacting=2, replicates=2, genes
   
   Mu = matrix(0, exons*genes, conditions)     # Means
   I  = matrix(0, exons*genes, conditions)     # Interactions
+
   
   # Inferred parameters - PSI
   alphas = matrix(0, exons*genes, conditions)    # Beta shape 1; Alphas
@@ -85,7 +86,6 @@ generate <- function(exons=16, conditions=20, interacting=2, replicates=2, genes
   
   # Create metadata and store to disk
   cdx = NULL
-  ints = melt(I)
   if(!is.null(data.dir)){
     count.dir = file.path(data.dir, "data")
     pars.dir = file.path(data.dir, "parameters")
@@ -120,6 +120,7 @@ generate <- function(exons=16, conditions=20, interacting=2, replicates=2, genes
     message("Storing parameters")
     row.names(I) = exons_genes
     colnames(I) = condition.ids
+    ints = melt(I)
     ints = ints[order(ints$value),]
     colnames(ints) = c("featureID", "condition", "interaction")
     row.names(ints) = sprintf("%s:%s", ints$featureID, ints$condition)
