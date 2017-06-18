@@ -54,18 +54,19 @@ dispersion.dexseq <- function(obj){
 Generate a dataset with a fixed vector of `dispersions`. The values are the same for each of the `repeats`, enabling to compute mean predictions and standard deviations. The DEXSeq dispersion fitting can fail in the case of a large number of zero counts. 
 
 ```{r, message=FALSE, warning=FALSE}
-conditions = 50
+conditions = 3
 exons = 20
-repeats = 10
+repeats = 30
 replicates = 3
+genes = 3
 
-dispersions = rev(sort(rgamma(exons, 1, 2.5)))
+dispersions = rev(sort(rgamma(exons*genes, 1, 2.5)))
 
-est.cdx = matrix(0, nrow=repeats, ncol=exons)
-est.dex = matrix(0, nrow=repeats, ncol=exons)
+est.cdx = matrix(0, nrow=repeats, ncol=exons*genes)
+est.dex = matrix(0, nrow=repeats, ncol=exons*genes)
 for (r in 1:repeats){
   obj = generate(exons=exons, conditions=conditions, 
-                   interacting=0, replicates=replicates, genes=1, 
+                   interacting=0, replicates=replicates, genes=genes, 
                    dispersions = dispersions,
                    type="count", data.dir=data.dir)
   
@@ -80,7 +81,13 @@ for (r in 1:repeats){
 Compute means and stadard deviations. Finally, compare the fits on a plot and compute root mean square errors. Observe the error decreasing with a larger number of experimental conditions.
   
 ```{r}
-  x = 1:exons
+  # Store data matrices
+  fname = sprintf("/Users/martin/Desktop/dispersions/dispersions_ncon-%d_cdx.tab", conditions)
+  write.table(est.cdx, fname, row.names = FALSE, col.names = FALSE)
+  fname = sprintf("/Users/martin/Desktop/dispersions/dispersions_ncon-%d_dex.tab", conditions)
+  write.table(est.dex, fname, row.names = FALSE, col.names = FALSE)
+
+  x = 1:(exons*genes)
   mean.cdx = colMeans(est.cdx)
   std.cdx = apply(est.cdx, 2, sd)
   down.cdx = mean.cdx + std.cdx
@@ -95,7 +102,8 @@ Compute means and stadard deviations. Finally, compare the fits on a plot and co
   rmse.dex = sqrt(sum((mean.dex - dispersions)^2))
   
   pdf(sprintf("/Users/martin/Desktop/dispersions/dispersions_ncon-%d.pdf", conditions), width=3.38, height=3.38)
-  plot(dispersions, type="l", col="black", xlab="Exon", ylab="Dispersion")
+  plot(dispersions, type="l", col="black", xlab="Exon", ylab="Dispersion",
+       main = sprintf("Conditions: %d", conditions))
   op = par(cex = 0.8)
   lines(mean.cdx, col="orange")
   lines(mean.dex, col="blue")
@@ -105,5 +113,7 @@ Compute means and stadard deviations. Finally, compare the fits on a plot and co
          c(sprintf("qCML (%.2f)", rmse.cdx), sprintf("Cox-Reid (%.2f)", rmse.dex)),   
          fill=c("orange", "blue"), bty="n")
   dev.off()
+  
+  
 ```
 

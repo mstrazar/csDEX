@@ -13,6 +13,7 @@ require(csDEX)
 require(DEXSeq)
 require(ggplot2)
 require(pROC)
+require(xtable)
 data.dir = file.path(getwd(), "csdex-temp/")
 ```
 
@@ -101,7 +102,7 @@ score.AUC <- function(obj, results){
 The experiments is executed for a given number of `repeats`, enabling the computation of means and standard deviations. For comparable scores, the percentage of interacting (exon, condition) pairs is kept at a constant percentage.
 
 ```{r, message=FALSE}
-repeats = 5
+repeats = 30
 exons = 20
 interacting = 0.05 
 replicates = 2
@@ -137,11 +138,70 @@ The results are plotted using the `ggplot` package. Observe the change in predic
 
 ```{r}
 qplot(data=results, x=as.factor(conditions), y=AUC, fill=method, 
-      geom="boxplot", xlab="Num. conditions", main="Count models")
+      geom="boxplot", xlab="Num. conditions", main="Count models") + scale_fill_grey(start=0.4, end=0.9) + theme_bw() + theme(legend.position = "top")
 
-ggsave("prediction_count.pdf", width = 3.38, height = 2.4)
+ggsave("prediction_count.pdf", width = 3.38, height = 3.38) 
 write.table(results, "prediction_count.tab", row.names=FALSE, sep="\t")
 ```
+
+
+Run a statistical analysis of ranking within the results.
+
+```{r}
+results = read.table("prediction_count.tab", header = TRUE)
+test_frame = data.frame()
+for (nc in c(unique(results$conditions), "all")){
+  if(nc == "all"){
+    x = results[results$method == "csDEX", "AUC"]
+    y = results[results$method == "DEXSeq", "AUC"] 
+  } else {
+    x = results[results$conditions == nc & results$method == "csDEX", "AUC"]
+    y = results[results$conditions == nc & results$method == "DEXSeq", "AUC"]  
+  }
+  wilc = wilcox.test(x, y, paired = TRUE, alternative = "greater")
+  tt = t.test(x, y, alternative = "greater")
+  df = data.frame(p=nc, mean.csDEX=mean(x), mean.DEXSeq=mean(y),
+                  wilcox.p=wilc$p.value, ttest.p=tt$p.value)
+  test_frame = rbind(test_frame, df)
+}
+
+sink("prediction_stats_count.tex")
+print(xtable(test_frame, digits=c(0, 0, 3, 3, -1, -1), display=c("d", "d", "f", "f", "e", "e")), 
+      include.rownames=FALSE)
+sink()
+```
+
+```{r}
+results = read.table("prediction_PSI.tab", header = TRUE)
+test_frame = data.frame()
+for (nc in c(unique(results$conditions), "all")){
+  if(nc == "all"){
+    x = results[results$method == "full", "AUC"]
+    y = results[results$method == "pairwise", "AUC"] 
+  } else {
+    x = results[results$conditions == nc & results$method == "full", "AUC"]
+    y = results[results$conditions == nc & results$method == "pairwise", "AUC"]  
+  }
+  wilc = wilcox.test(x, y, paired = TRUE, alternative = "greater")
+  tt = t.test(x, y, alternative = "greater")
+  df = data.frame(p=nc, mean.full=mean(x), mean.pairwise=mean(y),
+                  wilcox.p=wilc$p.value, ttest.p=tt$p.value)
+  test_frame = rbind(test_frame, df)
+}
+
+sink("prediction_stats_PSI.tex")
+print(xtable(test_frame, digits=c(0, 0, 2, 2, -1, -1), display=c("d", "d", "f", "f", "e", "e")), 
+      include.rownames=FALSE)
+sink()
+```
+
+
+
+
+
+
+
+
 
 
 
@@ -191,7 +251,7 @@ run.csdex.PSI.pairwise <- function(obj, workers=1, alpha.wald=NULL){
 The simulation with multiple `repeats` is performed accordingly.
 
 ```{r, message=FALSE}
-repeats = 5
+repeats = 30
 exons = 20
 interacting = 0.05 
 replicates = 2
@@ -222,11 +282,12 @@ for (r in 1:repeats){
   }
 }
 ```
+
 ```{r}
 qplot(data=results, x=as.factor(conditions), y=AUC, fill=method, 
-      geom="boxplot", xlab="Num. conditions", main="PSI models")
+      geom="boxplot", xlab="Num. conditions", main="PSI models") + scale_fill_grey(start=0.4, end=0.9) + theme_bw() + theme(legend.position = "top")
 
-ggsave("prediction_PSI.pdf", width = 3.38, height = 2.4)
+ggsave("prediction_PSI.pdf", width = 3.38, height = 3.38)
 write.table(results, "prediction_PSI.tab", row.names=FALSE, sep="\t")
 ```
 
