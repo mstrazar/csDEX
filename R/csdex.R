@@ -297,7 +297,8 @@ waldTest <- function(mm0, model0, alpha=0.05){
 
 
 geneModel <- function(input, min.cpm=NULL, tmp.dir=NULL, dist="count", 
-                      alpha.wald=NULL, formula=y~featureID+condition){
+                      alpha.wald=NULL, formula=y~featureID+condition,
+                      scale=1, offset=0){
   
     # Writing to file
     write.gene.file <- function(tmp.dir, results, gene){
@@ -338,6 +339,7 @@ geneModel <- function(input, min.cpm=NULL, tmp.dir=NULL, dist="count",
 
     # Correct values to (0, 1) for the beta model
     N = nrow(results)
+    results$y = (results$y - offset) / scale
     if(dist == "PSI")
         results$y = ((N - 1) * results$y + 0.5) / N
     if(dist == "count")
@@ -438,6 +440,9 @@ geneModel <- function(input, min.cpm=NULL, tmp.dir=NULL, dist="count",
             results$pvalue[i] = 1
         }
     }
+    
+    # Correct back to original scale
+    results$y = scale * results$y + offset
 
     # Correct for multiple testing
     results$interaction = NULL
@@ -452,7 +457,8 @@ geneModel <- function(input, min.cpm=NULL, tmp.dir=NULL, dist="count",
 
 
 testForDEU <- function(cdx, workers=1, tmp.dir=NULL, min.cpm=NULL, alpha.wald=NULL,
-                       formula=y~featureID+condition){
+                       formula=y~featureID+condition,
+                       scale=1, offset=0){
     # Test for differential exon usage given a csDEX data object file,
     # with calculated precisions and size factors. Only test genes
     #   if they have any reads mapped onto them
@@ -486,13 +492,13 @@ testForDEU <- function(cdx, workers=1, tmp.dir=NULL, min.cpm=NULL, alpha.wald=NU
     if(workers > 1){
       message(sprintf("Dispatching on %d workers, cache directory %s. \n", workers, tmp.dir))
       jobs = mclapply(inputs, csDEX::geneModel, 
-                      min.cpm, tmp.dir, dist, alpha.wald, formula,
+                      min.cpm, tmp.dir, dist, alpha.wald, formula, scale, offset,
                       mc.preschedule=FALSE, mc.cores=workers, mc.silent=TRUE)
     } else {
       jobs = list()
       for(inp in inputs) 
         jobs[[length(jobs)+1]] = csDEX::geneModel(inp, min.cpm, tmp.dir, 
-                                          dist, alpha.wald, formula)
+                                          dist, alpha.wald, formula, scale, offset)
     }
 
     if(is.null(tmp.dir)){

@@ -25,6 +25,15 @@ test_that("test csDEX dataset - PSI (reduced workflow with Wald test)", {
   result = testForDEU(cdx, workers=1, tmp.dir=NULL, alpha.wald=0.05)
 })
 
+test_that("test csDEX dataset - PSI (data with offset)", {
+  # Simulate deltaPSI in (-1, 1)
+  cdx = csDEXdataSet(data.dir=data.dir.psi, design.file=design.file, type="PSI")
+  exprData(cdx) = 2 * exprData(cdx) - 1
+  expect_s4_class(cdx, "csDEXdataSet")
+  resultDP = testForDEU(cdx, workers=1, tmp.dir=NULL, scale=2, offset=-1)
+})
+
+
 test_that("test csDEX dataset - count (standard workflow)", {
   cdx = csDEXdataSet(data.dir=data.dir.count, design.file=design.file, type="count")
   expect_s4_class(cdx, "csDEXdataSet")
@@ -58,6 +67,15 @@ test_that("test csDEX dataset - PSI (standard workflow)", {
   expect_s4_class(cdx, "csDEXdataSet")
   result = testForDEU(cdx, workers=2, tmp.dir=NULL)
 })
+
+test_that("test csDEX dataset - PSI (data with offset)", {
+  # Simulate deltaPSI in (-1, 1)
+  cdx = csDEXdataSet(data.dir=data.dir.psi, design.file=design.file, type="PSI")
+  exprData(cdx) = 2 * exprData(cdx) - 1
+  expect_s4_class(cdx, "csDEXdataSet")
+  resultDP = testForDEU(cdx, workers=2, tmp.dir=NULL, scale=2, offset=-1)
+})
+
 
 ### Additional fields
 test_that("test csDEX dataset - PSI (additional column)", {
