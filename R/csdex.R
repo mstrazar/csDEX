@@ -180,7 +180,7 @@ csDEXdataSet <- function(data.dir, design.file, type="count",
     
     for (i in 1:length(conditions)){
         cond = conditions[i]
-        message(sprintf("Condition %s", cond))
+        message(sprintf("Condition %s (%d/%d)", cond, i, length(conditions)))
 
         replicates = design[design[,col.condition] == cond, col.replicate]
 
