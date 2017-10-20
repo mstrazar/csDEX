@@ -142,7 +142,7 @@ csDEXdataSet <- function(data.dir, design.file, type="count",
 
         for(g in unique(genes)){
             inxs = genes == g
-            zeros = which(apply(repData[inxs, ], 2, sum) < min.count)
+            zeros = which(apply(as.matrix(repData[inxs, ]), 2, sum) < min.count)
             repData[inxs, zeros] = NA
         }
             return(repData)
