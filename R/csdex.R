@@ -110,6 +110,7 @@ csDEXdataSet <- function(data.dir, design.file, type="count",
         col.replicate="File.accession",
         col.testable="testable",
         col.read.count="input.read.count",
+        col.control=NULL,
         col.additional=c(),
         data.file.ext="txt",
         aggregation=NULL,
@@ -148,9 +149,10 @@ csDEXdataSet <- function(data.dir, design.file, type="count",
     }
 
     # Parse design file and ensure columns are present
-    design = read.csv(design.file, sep="\t", header=TRUE)
+    design = read.csv(design.file, sep="\t", header=TRUE, stringsAsFactors = FALSE)
     stopifnot(col.condition %in% colnames(design))
     stopifnot(col.replicate %in% colnames(design))
+    if(!is.null(col.control)) stopifnot(col.control %in% colnames(design)) 
     
     # Input check if additional columns have been requested
     # Assert values of additional columns can be uniquely mapped to conditions
@@ -252,14 +254,53 @@ csDEXdataSet <- function(data.dir, design.file, type="count",
     
     # Append additional columns
     colData$testable = testable
+    colData$Controlled.by = NA
+    if(!is.null(col.control))
+      col.additional = unique(c(col.additional, col.control))
     for (col.name in col.additional){
       for (cond in colData$condition){
         val = unique(design[design[,col.condition] == cond, col.name])
         colData[cond, col.name] = val
       }
     }
+    if(!is.null(col.control))
+      colData$Controlled.by = colData[,col.control]
+    
     new("csDEXdataSet", exprData=exprData, rowData=rowData, colData=colData, dataType=type)
 }
+
+
+normalizeToControls <- function(obj){
+  # Use data on controls to normalize corresponding conditions. 
+  # Retain control columns (which are effectively nullified).
+  # For PSI data, use difference (delta PSI).
+  # For count data, use fold difference.
+  expr = exprData(obj)
+  cd = colData(obj)
+  rd = rowData(obj)
+  type = dataType(obj)
+  
+  # Map controls to cases via names
+  controls = cd$Controlled.by
+  names(controls) <- row.names(cd)
+  stopifnot(all(!is.na(controls)))
+  stopifnot(all(controls %in% colnames(expr)))
+  
+  # Normalize data
+  if(type == "PSI") 
+      expr.new = expr[,names(controls)] - expr[,controls]
+  if(type == "count") {
+      stop("Normalization not implemented for count data.")
+  }
+  
+  # Retain only case columns
+  cases = setdiff(colnames(expr), controls)
+  expr.new = expr.new[,cases]
+  cd.new = cd[cases,]
+  
+  new("csDEXdataSet", exprData=expr.new, rowData=rd, colData=cd.new, dataType=type)  
+}
+
 
 waldTest <- function(mm0, model0, alpha=0.05){
   # Wald test for Beta model coefficients

@@ -33,6 +33,17 @@ test_that("test csDEX dataset - PSI (data with offset)", {
   resultDP = testForDEU(cdx, workers=1, tmp.dir=NULL, scale=2, offset=-1)
 })
 
+test_that("test csDEX dataset - PSI (data with offset and controls)", {
+  # Simulate deltaPSI in (-1, 1)
+  cdx = csDEXdataSet(data.dir=data.dir.psi, 
+                     design.file=design.file, 
+                     type="PSI", 
+                     col.condition = "Experiment.accession",
+                     col.additional =  c("Controlled.by"))
+  cdxn = normalizeToControls(cdx)
+  expect_s4_class(cdxn, "csDEXdataSet")
+  resultDP = testForDEU(cdxn, workers=1, tmp.dir=NULL, scale=2, offset=-1)
+})
 
 test_that("test csDEX dataset - count (standard workflow)", {
   cdx = csDEXdataSet(data.dir=data.dir.count, design.file=design.file, type="count")
