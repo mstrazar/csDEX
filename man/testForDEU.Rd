@@ -38,16 +38,11 @@ waldTest(mm0, model0, alpha=0.05)
   any parameters non-significantly different from zero in the null model are merged to a single "error" parameter.
   Can significantly reduce computation time for large and sparse datasets.
 }
-\item{formula} 
+\item{formula}{
   Formula object describing the null model. For the alternative model, an interaction term for the current `(featureID, condition)` pair is appended.
-  
-\item{scale} Offset and scale to allow for modifying data ranges for both PSI and count models.
-  The following transformation is assumed: 
-    `Y' = scale * Y + offset`  where Y' is the data passed to the model and Y are the values in (-1, 1).
-  
-\item{offset} Offset. See `scale`.
-  
 }
+}
+
 \details{
 The core function of the package. Evaluate significance of all possible pairs of interactions between features and conditions by means of difference in deviance model selection. Generalized linear models (GLMs) based on the Negative Binomial distribution are assumed for the quantification based on read counts. The Beta distribution GLM is used to model data based on  percentage-spliced (PSI) quantification.  
 
