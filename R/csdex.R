@@ -67,11 +67,18 @@ setMethod("estimateSizeFactors", "csDEXdataSet",
 
 # Return a csDEXdataSet with estimated precisions
 setGeneric("estimatePrecisions",
-    function(obj) standardGeneric("estimatePrecisions"))
+    function(obj, ...) standardGeneric("estimatePrecisions"))
 setMethod("estimatePrecisions", "csDEXdataSet",
-    function(obj) {        
-        expr = csDEX::exprData(obj, normalized = TRUE)
-        csDEX::rowData(obj)$precision = 1.0 / edgeR::estimateDisp(expr)$tagwise.dispersion
+    function(obj, ...) {        
+        if(csDEX::dataType(obj) == "count"){
+          expr = csDEX::exprData(obj, normalized = TRUE)
+          csDEX::rowData(obj)$precision = 1.0 / edgeR::estimateDisp(expr)$tagwise.dispersion
+        } else if(csDEX::dataType(obj) == "PSI") {
+          expr = csDEX::exprData(obj)
+          df = csDEX::estimateBetaPrecisions(expr, ...)[row.names(expr),]
+          csDEX::rowData(obj) = cbind(csDEX::rowData(obj), df)
+          csDEX::rowData(obj)$precision = df$phi.fit.min
+        }
         obj
         })
 
@@ -273,7 +280,7 @@ csDEXdataSet <- function(data.dir, design.file, type="count",
 normalizeToControls <- function(obj){
   # Use data on controls to normalize corresponding conditions. 
   # Retain control columns (which are effectively nullified).
-  # For PSI data, use difference (delta PSI).
+  # For PSI data, use difference (delta PSI) and remap to [0, 1].
   # For count data, use fold difference.
   expr = exprData(obj)
   cd = colData(obj)
@@ -288,9 +295,11 @@ normalizeToControls <- function(obj){
   
   # Normalize data
   if(type == "PSI") 
+      # Subtract control and re-fit.
       expr.new = expr[,names(controls)] - expr[,controls]
+      expr.new = csDEX::intToZo(expr.new)
   if(type == "count") {
-      stop("Normalization not implemented for count data.")
+      stop("Normalization w.r.t. controls not implemented for count data.")
   }
   
   # Retain only case columns
@@ -338,8 +347,7 @@ waldTest <- function(mm0, model0, alpha=0.05){
 
 
 geneModel <- function(input, min.cpm=NULL, tmp.dir=NULL, dist="count", 
-                      alpha.wald=NULL, formula=y~featureID+condition,
-                      scale=1, offset=0){
+                      alpha.wald=NULL, formula=y~featureID+condition){
   
     # Writing to file
     write.gene.file <- function(tmp.dir, results, gene){
@@ -378,18 +386,27 @@ geneModel <- function(input, min.cpm=NULL, tmp.dir=NULL, dist="count",
         results[results$cpm < min.cpm, "msg"] = "low cpm"
     }
 
-    # Correct values to (0, 1) for the beta model
-    N = nrow(results)
-    results$y = (results$y - offset) / scale
-    if(dist == "PSI")
-        results$y = ((N - 1) * results$y + 0.5) / N
-    if(dist == "count")
+    # Correct values to (0, 1) for the beta model or round counts
+    if(dist == "PSI"){
+        results$y = csDEX::zoSqueeze(csDEX::intToZo(results$y))
+        phi = results$precision
+        if(all(is.na(phi))){ # Unknown precision values.
+          message("Precision values will be estimated with the model")
+          phi.z = NULL
+          phi.link = "log"
+        } else {  # Pre-defined precision values.
+          message("Using pre-computed precision values")
+          phi.z = matrix(phi, nrow=length(phi))
+          phi.link = "identity"
+        }
+    } else if(dist == "count"){
         results$y = round(results$y)
+    }
 
     # Null hypothesis
     frm0 = formula
     mm0  = model.matrix(frm0, results)
-
+    
     # Fit null model and store coefficients for better initialization
     if(dist == "count"){
         model0 = tryCatch(csDEX::nbreg.fit(X=mm0, 
@@ -400,7 +417,10 @@ geneModel <- function(input, min.cpm=NULL, tmp.dir=NULL, dist="count",
                   error = function(e) e)
     } else if(dist == "PSI"){
         model0 = tryCatch(
-                betareg::betareg.fit(x=mm0, y=as.vector(results$y)),
+                # phi.z will be raised by a factor if provided 
+                # and the resulting precision will be over-estimated
+                betareg::betareg.fit(x=mm0, y=as.vector(results$y), 
+                                     z=phi.z, link.phi=phi.link),
                 warning = function(w) w,
                 error = function(e) e)        
     }
@@ -456,8 +476,11 @@ geneModel <- function(input, min.cpm=NULL, tmp.dir=NULL, dist="count",
             coefs.beta.init = model0$coefficients
             coefs.beta.init$mean = c(start.coefs, 0)
             model1 = tryCatch(
+                # phi.z will be raised by a factor if provided 
+                # and the resulting precision will be over-estimated
                 betareg::betareg.fit(x=mm1, y=as.vector(results$y),
-                    control=betareg::betareg.control(start=coefs.beta.init)),
+                                     z=phi.z, link.phi=phi.link,
+                                     control=betareg::betareg.control(start=coefs.beta.init)),
                 warning = function(w) w,
                 error = function(e) e)
         }
@@ -467,24 +490,29 @@ geneModel <- function(input, min.cpm=NULL, tmp.dir=NULL, dist="count",
           results$testable[i] = FALSE
           next
         }
-          
+        
+        # Re-compute log-likelihood if precision is provided beforehand
+        loglik0 = model0$loglik
+        loglik1 = model1$loglik
+        if(dist == "PSI" && !is.null(phi.z)){
+          loglik0 = csDEX::dbeta.loglik(y=results$y, mu = model0$fitted.values, phi = phi.z)
+          loglik1 = csDEX::dbeta.loglik(y=results$y, mu = model1$fitted.values, phi = phi.z)
+        }
+        
         # Compute difference of deviance (likelihood ratio) test statistic
         results$time[i] = Sys.time() - start.time
-        results$loglik[i] = model1$loglik
-
-        # Likelihood ratio-test pvalue
-        ddev = 2 * (model1$loglik - model0$loglik)
+        results$loglik[i] = loglik1
+        
+        # Likelihood ratio-test pvalue (deviance test)
+        ddev = 2 * (loglik1 - loglik0)
         results$ddev[i] = ddev
-        if (ddev > 0){
-            results$pvalue[i] = 1.0 - pchisq(ddev, 1)
-        } else {
-            results$pvalue[i] = 1
-        }
+        results$pvalue[i] = 1.0 - pchisq(ddev, 1)
     }
     
-    # Correct back to original scale
-    results$y = scale * results$y + offset
-
+    # Impute precision values for PSI model
+    if(dist == "PSI" && is.null(phi))
+      results$precision = exp(model0$coefficients$precision)
+    
     # Correct for multiple testing
     results$interaction = NULL
     results$padj = p.adjust(results$pvalue, method="bonferroni")
@@ -498,8 +526,7 @@ geneModel <- function(input, min.cpm=NULL, tmp.dir=NULL, dist="count",
 
 
 testForDEU <- function(cdx, workers=1, tmp.dir=NULL, min.cpm=NULL, alpha.wald=NULL,
-                       formula=y~featureID+condition,
-                       scale=1, offset=0){
+                       formula=y~featureID+condition){
     # Test for differential exon usage given a csDEX data object file,
     # with calculated precisions and size factors. Only test genes
     #   if they have any reads mapped onto them
@@ -533,13 +560,12 @@ testForDEU <- function(cdx, workers=1, tmp.dir=NULL, min.cpm=NULL, alpha.wald=NU
     if(workers > 1){
       message(sprintf("Dispatching on %d workers, cache directory %s. \n", workers, tmp.dir))
       jobs = mclapply(inputs, csDEX::geneModel, 
-                      min.cpm, tmp.dir, dist, alpha.wald, formula, scale, offset,
+                      min.cpm, tmp.dir, dist, alpha.wald, formula,
                       mc.preschedule=FALSE, mc.cores=workers, mc.silent=TRUE)
     } else {
       jobs = list()
       for(inp in inputs) 
-        jobs[[length(jobs)+1]] = csDEX::geneModel(inp, min.cpm, tmp.dir, 
-                                          dist, alpha.wald, formula, scale, offset)
+        jobs[[length(jobs)+1]] = csDEX::geneModel(inp, min.cpm, tmp.dir, dist, alpha.wald, formula)
     }
 
     if(is.null(tmp.dir)){
