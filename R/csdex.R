@@ -369,7 +369,7 @@ geneModel <- function(input, min.cpm=NULL, tmp.dir=NULL, dist="count",
     results[,colnames(coldata)] = coldata[as.character(results$condition), colnames(coldata)]
     results$featureID = droplevels(as.factor(results$featureID))
     results$condition = droplevels(as.factor(results$condition))
-    results[,c("cpm", "pvalue", "fdr", "fdr.all", "padj", "residual", "loglik", "ddev", "time", "nrow", "ncol", "msg")] = NA
+    results[,c("cpm", "pvalue", "fdr", "fdr.all", "padj", "fitted.values", "residual", "loglik", "ddev", "time", "nrow", "ncol", "msg")] = NA
 
     # Check variance
     if(var(results$y) == 0){
@@ -435,6 +435,7 @@ geneModel <- function(input, min.cpm=NULL, tmp.dir=NULL, dist="count",
     }
     
     # Filter testable values according to fit residual
+    results$fitted.values = model0$fitted.values
     results$residual = results$y - model0$fitted.values
     
     # Compute Wald test statistics if alpha.wald
@@ -580,4 +581,33 @@ testForDEU <- function(cdx, workers=1, tmp.dir=NULL, min.cpm=NULL, alpha.wald=NU
     } else {
       message(sprintf("Results for written to %s", tmp.dir))
     }
+}
+
+
+plotDEUresults <- function(results, thresh=0.05, gene=NULL){
+  # Plot DEU results for a given gene
+  if(is.null(gene)) gene = results$groupID[1]
+  df = results[!is.na(results$pvalue) & results$groupID == gene,]
+  
+  # Order features by empirical means
+  df = df[order(df$mean, df$featureID, abs(df$fitted.values-df$mean)),]
+  tmp = base::rank(df$featureID, ties.method = "min")
+  df$rank = unlist(lapply(tmp, function(x) which(x == unique(tmp))))
+  
+  # Data statistics
+  mu = df$fitted.values
+  phi = df$precision
+  var = csDEX::muphiToVar(mu, phi)
+  sd = sqrt(var)
+  sig = df$pvalue < thresh
+  inxs = !duplicated(df$rank)
+  
+  # Plot gene model
+  plot(df$rank, df$y, col="gray", 
+       xlab="Exonic part (order by mean)",  ylab = "PSI", 
+       main=sprintf("Data fit (%s, p<%.2f)", gene, thresh))
+  points(df$rank[sig], df$y[sig], pch=19, col=scales::alpha("red", 0.3))
+  lines(df$rank[inxs], (mu)[inxs], col="orange")
+  lines(df$rank[inxs], (mu-1.96*sd)[inxs], col="gray", lty="dashed")
+  lines(df$rank[inxs], (mu+1.96*sd)[inxs], col="gray", lty="dashed")
 }
