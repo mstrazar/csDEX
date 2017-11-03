@@ -391,11 +391,9 @@ geneModel <- function(input, min.cpm=NULL, tmp.dir=NULL, dist="count",
         results$y = csDEX::zoSqueeze(csDEX::intToZo(results$y))
         phi = results$precision
         if(all(is.na(phi))){ # Unknown precision values.
-          message("Precision values will be estimated with the model")
           phi.z = NULL
           phi.link = "log"
         } else {  # Pre-defined precision values.
-          message("Using pre-computed precision values")
           phi.z = matrix(phi, nrow=length(phi))
           phi.link = "identity"
         }
