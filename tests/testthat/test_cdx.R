@@ -26,11 +26,11 @@ test_that("test csDEX dataset - PSI (reduced workflow with Wald test)", {
 })
 
 test_that("test csDEX dataset - PSI (data with offset)", {
-  # Simulate deltaPSI in (-1, 1)
+  # Simulate data in (-2, 2)
   cdx = csDEXdataSet(data.dir=data.dir.psi, design.file=design.file, type="PSI")
-  exprData(cdx) = 2 * exprData(cdx) - 1
+  exprData(cdx) = 4 * exprData(cdx) - 1
   expect_s4_class(cdx, "csDEXdataSet")
-  resultDP = testForDEU(cdx, workers=1, tmp.dir=NULL, scale=2, offset=-1)
+  resultDP = testForDEU(cdx, workers=1, tmp.dir=NULL)
 })
 
 test_that("test csDEX dataset - PSI (data with offset and controls)", {
@@ -42,7 +42,22 @@ test_that("test csDEX dataset - PSI (data with offset and controls)", {
                      col.additional =  c("Controlled.by"))
   cdxn = normalizeToControls(cdx)
   expect_s4_class(cdxn, "csDEXdataSet")
-  resultDP = testForDEU(cdxn, workers=1, tmp.dir=NULL, scale=2, offset=-1)
+  resultDP = testForDEU(cdxn, workers=1, tmp.dir=NULL)
+})
+
+test_that("test csDEX dataset - PSI (data with offset, controls and precision fitting)", {
+  # Simulate deltaPSI in (-1, 1) and estimate precisions
+  cdx = csDEXdataSet(data.dir=data.dir.psi, 
+                     design.file=design.file, 
+                     type="PSI", 
+                     col.condition = "Experiment.accession",
+                     col.additional =  c("Controlled.by"))
+  cdxn = normalizeToControls(cdx)
+  expect_s4_class(cdxn, "csDEXdataSet")
+  cdxp = estimatePrecisions(cdxn)
+  stopifnot(all(!is.na(rowData(cdxp)$precision)))
+  stopifnot(all(rowData(cdxp)$precision > 0))
+  resultDP = testForDEU(cdxp, workers=1, tmp.dir=NULL)
 })
 
 test_that("test csDEX dataset - count (standard workflow)", {
@@ -84,7 +99,7 @@ test_that("test csDEX dataset - PSI (data with offset)", {
   cdx = csDEXdataSet(data.dir=data.dir.psi, design.file=design.file, type="PSI")
   exprData(cdx) = 2 * exprData(cdx) - 1
   expect_s4_class(cdx, "csDEXdataSet")
-  resultDP = testForDEU(cdx, workers=2, tmp.dir=NULL, scale=2, offset=-1)
+  resultDP = testForDEU(cdx, workers=2, tmp.dir=NULL)
 })
 
 
