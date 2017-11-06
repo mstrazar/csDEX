@@ -355,6 +355,20 @@ geneModel <- function(input, min.cpm=NULL, tmp.dir=NULL, dist="count",
           fname = file.path(tmp.dir, sprintf("%s.csv", gene))
           write.csv(results, fname, quote=TRUE, row.names=FALSE)}
     }
+    
+    # Replace NAs with zeros
+    na.zero <- function (x) {
+      x[is.na(x)] <- 0
+      return(x)
+    }
+  
+    # Return x predecessor (off=-1) or ancestor (off=1) or similar element,
+    # related to x in list of strings xs or first element if ix is first
+    str.off <- function(x, xs, off=-1){
+      sxs = sort(unique(xs))
+      ix = unlist(lapply(x, function(y) max(1, min(which(y == sxs) + off, length(sxs)))))
+      sxs[ix]
+    }
 
     # Extract input values
     expr = input$expr
@@ -369,7 +383,12 @@ geneModel <- function(input, min.cpm=NULL, tmp.dir=NULL, dist="count",
     results[,colnames(coldata)] = coldata[as.character(results$condition), colnames(coldata)]
     results$featureID = droplevels(as.factor(results$featureID))
     results$condition = droplevels(as.factor(results$condition))
-    results[,c("cpm", "pvalue", "fdr", "fdr.all", "padj", "fitted.values", "residual", "loglik", "ddev", "time", "nrow", "ncol", "msg")] = NA
+    results[,c("y.prev", "y.next", "cpm", "pvalue", "fdr", "fdr.all", 
+               "padj", "fitted.values", "residual", "loglik", 
+               "ddev", "time", "nrow", "ncol", "msg")] = NA
+    
+    # Set row names
+    row.names(results) = sprintf("%s:%s", results$featureID, results$condition)
 
     # Check variance
     if(var(results$y) == 0){
@@ -385,7 +404,7 @@ geneModel <- function(input, min.cpm=NULL, tmp.dir=NULL, dist="count",
         results$cpm = gene.cpm[as.character(results$condition)]
         results[results$cpm < min.cpm, "msg"] = "low cpm"
     }
-
+    
     # Correct values to (0, 1) for the beta model or round counts
     if(dist == "PSI"){
         results$y = csDEX::zoSqueeze(csDEX::intToZo(results$y))
@@ -400,6 +419,12 @@ geneModel <- function(input, min.cpm=NULL, tmp.dir=NULL, dist="count",
     } else if(dist == "count"){
         results$y = round(results$y)
     }
+    
+    # Map previous values that may be used in the model formula
+    idx1 = sprintf("%s:%s", str.off(results$featureID, results$featureID, -1), results$condition)
+    idx2 = sprintf("%s:%s", str.off(results$featureID, results$featureID, 1), results$condition)
+    results$y.prev = na.zero(results[idx1, "y"])
+    results$y.next = na.zero(results[idx2, "y"])
 
     # Null hypothesis
     frm0 = formula
@@ -558,7 +583,7 @@ testForDEU <- function(cdx, workers=1, tmp.dir=NULL, min.cpm=NULL, alpha.wald=NU
     # If workers == 1, run within the same process
     if(workers > 1){
       message(sprintf("Dispatching on %d workers, cache directory %s. \n", workers, tmp.dir))
-      jobs = mclapply(inputs, csDEX::geneModel, 
+      jobs = parallel::mclapply(inputs, csDEX::geneModel, 
                       min.cpm, tmp.dir, dist, alpha.wald, formula,
                       mc.preschedule=FALSE, mc.cores=workers, mc.silent=TRUE)
     } else {
@@ -582,13 +607,13 @@ testForDEU <- function(cdx, workers=1, tmp.dir=NULL, min.cpm=NULL, alpha.wald=NU
 }
 
 
-plotDEUresults <- function(results, thresh=0.05, gene=NULL){
+plotDEUresults <- function(results, thresh=0.05, gene=NULL, condition=NULL){
   # Plot DEU results for a given gene
   if(is.null(gene)) gene = results$groupID[1]
   df = results[!is.na(results$pvalue) & results$groupID == gene,]
   
   # Order features by empirical means
-  df = df[order(df$mean, df$featureID, abs(df$fitted.values-df$mean)),]
+  df = df[order(df$featureID, abs(df$fitted.values-df$mean)),]
   tmp = base::rank(df$featureID, ties.method = "min")
   df$rank = unlist(lapply(tmp, function(x) which(x == unique(tmp))))
   
@@ -600,12 +625,23 @@ plotDEUresults <- function(results, thresh=0.05, gene=NULL){
   sig = df$pvalue < thresh
   inxs = !duplicated(df$rank)
   
+  # Point marks
+  df$pch = 19
+  if(!is.null(condition)) {
+    df$pch[df$condition == condition & df$residual > 0 ] = 24
+    df$pch[df$condition == condition & df$residual < 0 ] = 25
+  }
+  
   # Plot gene model
   plot(df$rank, df$y, col="gray", 
-       xlab="Exonic part (order by mean)",  ylab = "PSI", 
+       xlab="Exonic part (order by mean)",  ylab = "PSI", pch=df$pch,
        main=sprintf("Data fit (%s, p<%.2f)", gene, thresh))
-  points(df$rank[sig], df$y[sig], pch=19, col=scales::alpha("red", 0.3))
+  points(df$rank[sig], df$y[sig], pch=df$pch[sig], col=scales::alpha("red", 0.3))
   lines(df$rank[inxs], (mu)[inxs], col="orange")
   lines(df$rank[inxs], (mu-1.96*sd)[inxs], col="gray", lty="dashed")
   lines(df$rank[inxs], (mu+1.96*sd)[inxs], col="gray", lty="dashed")
+  if(!is.null(condition)) {
+    jnxs = df$condition == condition
+    lines(df$rank[jnxs], df$y[jnxs], col="blue")
+  }
 }
