@@ -60,6 +60,21 @@ test_that("test csDEX dataset - PSI (data with offset, controls and precision fi
   resultDP = testForDEU(cdxp, workers=1, tmp.dir=NULL)
 })
 
+test_that("test csDEX dataset - PSI (data with offset, controls and precision fitting and pvalue threshold)", {
+  # Simulate deltaPSI in (-1, 1) and estimate precisions
+  cdx = csDEXdataSet(data.dir=data.dir.psi, 
+                     design.file=design.file, 
+                     type="PSI", 
+                     col.condition = "Experiment.accession",
+                     col.additional =  c("Controlled.by"))
+  cdxn = normalizeToControls(cdx)
+  expect_s4_class(cdxn, "csDEXdataSet")
+  cdxp = estimatePrecisions(cdxn)
+  stopifnot(all(!is.na(rowData(cdxp)$precision)))
+  stopifnot(all(rowData(cdxp)$precision > 0))
+  resultDP = testForDEU(cdxp, workers=1, tmp.dir=NULL, p.thresh=0.05)
+})
+
 test_that("test csDEX dataset - count (standard workflow)", {
   cdx = csDEXdataSet(data.dir=data.dir.count, design.file=design.file, type="count")
   expect_s4_class(cdx, "csDEXdataSet")

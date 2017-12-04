@@ -347,7 +347,8 @@ waldTest <- function(mm0, model0, alpha=0.05){
 
 
 geneModel <- function(input, min.cpm=NULL, tmp.dir=NULL, dist="count", 
-                      alpha.wald=NULL, formula=y~featureID+condition){
+                      alpha.wald=NULL, formula=y~featureID+condition, 
+                      p.thresh=NULL){
   
     # Writing to file
     write.gene.file <- function(tmp.dir, results, gene){
@@ -385,10 +386,18 @@ geneModel <- function(input, min.cpm=NULL, tmp.dir=NULL, dist="count",
     results$condition = droplevels(as.factor(results$condition))
     results[,c("y.prev", "y.next", "cpm", "pvalue", "fdr", "fdr.all", 
                "padj", "fitted.values", "residual", "loglik", 
-               "ddev", "time", "nrow", "ncol", "msg")] = NA
+               "ddev", "extremity", "time", "nrow", "ncol", "msg")] = NA
     
     # Set row names
     row.names(results) = sprintf("%s:%s", results$featureID, results$condition)
+    
+    # Order results by featureID and absolute value y-mean 
+    # (extremity of the measurement)
+    if(!is.null(p.thresh)){
+      stopifnot("mean" %in% colnames(results))
+      results$extremity = abs(results$y-results$mean)
+      results = results[order(results$featureID, -results$extremity),]
+    }
 
     # Check variance
     if(var(results$y) == 0){
@@ -531,6 +540,15 @@ geneModel <- function(input, min.cpm=NULL, tmp.dir=NULL, dist="count",
         ddev = 2 * (loglik1 - loglik0)
         results$ddev[i] = ddev
         results$pvalue[i] = 1.0 - pchisq(ddev, 1)
+        
+        # Clear 
+        if(!is.null(p.thresh) && results$pvalue[i] > p.thresh){
+          feat = results$featureID[i]
+          yfeat = results$extremity[i]
+          inxs = (results$featureID == feat) & (results$extremity < yfeat)
+          results[inxs,  "testable"] = FALSE
+          results[inxs,  "msg"] = sprintf("Skipped; Reached p.thresh (%f)", p.thresh)
+        } 
     }
     
     # Impute precision values for PSI model
@@ -550,7 +568,7 @@ geneModel <- function(input, min.cpm=NULL, tmp.dir=NULL, dist="count",
 
 
 testForDEU <- function(cdx, workers=1, tmp.dir=NULL, min.cpm=NULL, alpha.wald=NULL,
-                       formula=y~featureID+condition){
+                       formula=y~featureID+condition, p.thresh=NULL){
     # Test for differential exon usage given a csDEX data object file,
     # with calculated precisions and size factors. Only test genes
     #   if they have any reads mapped onto them
@@ -584,12 +602,13 @@ testForDEU <- function(cdx, workers=1, tmp.dir=NULL, min.cpm=NULL, alpha.wald=NU
     if(workers > 1){
       message(sprintf("Dispatching on %d workers, cache directory %s. \n", workers, tmp.dir))
       jobs = parallel::mclapply(inputs, csDEX::geneModel, 
-                      min.cpm, tmp.dir, dist, alpha.wald, formula,
+                      min.cpm, tmp.dir, dist, alpha.wald, formula, p.thresh,
                       mc.preschedule=FALSE, mc.cores=workers, mc.silent=TRUE)
     } else {
       jobs = list()
       for(inp in inputs) 
-        jobs[[length(jobs)+1]] = csDEX::geneModel(inp, min.cpm, tmp.dir, dist, alpha.wald, formula)
+        jobs[[length(jobs)+1]] = csDEX::geneModel(inp, min.cpm, tmp.dir, dist, 
+                                                  alpha.wald, formula, p.thresh)
     }
 
     if(is.null(tmp.dir)){

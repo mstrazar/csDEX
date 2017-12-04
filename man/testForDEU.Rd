@@ -14,9 +14,9 @@ The waldTest is invoked by geneModel if model approximation is used.
 }
 \usage{
 testForDEU(cdx, workers = 1, tmp.dir = NULL, min.cpm = NULL, 
-  alpha.wald = NULL, formula = y ~ featureID + condition)
+  alpha.wald = NULL, formula = y ~ featureID + condition, p.thresh = NULL)
 geneModel(input, min.cpm = NULL, tmp.dir = NULL, dist="count", 
-  alpha.wald = NULL, formula = y ~ featureID + condition)
+  alpha.wald = NULL, formula = y ~ featureID + condition, p.thresh = NULL)
 waldTest(mm0, model0, alpha=0.05)
 }
 %- maybe also 'usage' for other objects documented here.
@@ -41,6 +41,7 @@ waldTest(mm0, model0, alpha=0.05)
 \item{formula}{
   Formula object describing the null model. For the alternative model, an interaction term for the current `(featureID, condition)` pair is appended.
 }
+\item{p.thresh}{Use with caution. Group observations by featureID and extremity (difference of observation versus mean). If pvalue reaches p.thresh, mark the remaining (not tested) features as non-testable.}
 }
 
 \details{
@@ -76,7 +77,7 @@ The time complexity of GLM fitting is cubic in the number of parameters, which e
 %% ~put references to the literature/web site here ~
 }
 \author{
-Martin Stražar
+Martin Stra??ar
 }
 \note{
 See the vignette for examples.
